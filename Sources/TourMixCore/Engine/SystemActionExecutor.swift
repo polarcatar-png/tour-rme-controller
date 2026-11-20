@@ -145,6 +145,95 @@ public struct KeyCombo: Codable, Equatable, Hashable, Sendable {
     ]
 }
 
+/// 旋钮 / 滚轮模拟触控板平滑滑动或鼠标滚轮参数模型。
+public struct MouseScrollConfig: Codable, Equatable, Hashable, Sendable {
+    public enum Mode: String, Codable, CaseIterable, Identifiable, Sendable {
+        /// 类触控板双指滑动（基于 `.pixel` 微帧插值的丝滑连续滚动）
+        case trackpadSmooth
+        /// 传统鼠标中键滚轮（基于 `.line` 的清晰刻度行滚动）
+        case mouseWheelLine
+
+        public var id: String { rawValue }
+
+        public var displayName: String {
+            switch self {
+            case .trackpadSmooth: return "类触控板双指平滑滑动 (像素级顺滑)"
+            case .mouseWheelLine: return "传统鼠标中键滚轮 (按行刻度)"
+            }
+        }
+    }
+
+    public enum Axis: String, Codable, CaseIterable, Identifiable, Sendable {
+        case vertical
+        case horizontal
+
+        public var id: String { rawValue }
+
+        public var displayName: String {
+            switch self {
+            case .vertical: return "上下垂直滚动 / 翻页"
+            case .horizontal: return "左右水平横向滚动"
+            }
+        }
+    }
+
+    public var mode: Mode
+    public var axis: Axis
+    /// 速度档位 `1...5`（默认 `3` 标准速度）
+    public var speed: Int
+    /// 反转滚动方向（适配个人「自然滚动」习惯）
+    public var invertDirection: Bool
+    /// 快速连续滚动时自动惯性加速
+    public var dynamicAcceleration: Bool
+
+    public init(
+        mode: Mode = .trackpadSmooth,
+        axis: Axis = .vertical,
+        speed: Int = 3,
+        invertDirection: Bool = false,
+        dynamicAcceleration: Bool = true
+    ) {
+        self.mode = mode
+        self.axis = axis
+        self.speed = min(5, max(1, speed))
+        self.invertDirection = invertDirection
+        self.dynamicAcceleration = dynamicAcceleration
+    }
+
+    public static let standard = MouseScrollConfig()
+}
+
+/// 模拟鼠标按键点击枚举（支持滚轮按下充当鼠标中键点击/按住拖拽）。
+public enum MouseClickButton: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
+    case middle
+    case left
+    case right
+    case back
+    case forward
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .middle: return "鼠标中键 (Middle Click · 支持按住拖拽/关标签)"
+        case .left: return "鼠标左键 (Left Click)"
+        case .right: return "鼠标右键 (Right Click)"
+        case .back: return "鼠标侧键 · 后退 (Back)"
+        case .forward: return "鼠标侧键 · 前进 (Forward)"
+        }
+    }
+
+    public var shortSummary: String {
+        switch self {
+        case .middle: return "鼠标中键"
+        case .left: return "鼠标左键"
+        case .right: return "鼠标右键"
+        case .back: return "鼠标后退"
+        case .forward: return "鼠标前进"
+        }
+    }
+}
+
 /// 系统级媒体控制键枚举（对应 `IOKit/hidsystem/ev_keymap.h` `NX_KEYTYPE_*`）。
 public enum MediaKeyAction: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
     case playPause
@@ -217,6 +306,9 @@ public struct ScriptExecutionResult: Equatable, Sendable {
 public final class SystemActionExecutor {
     private let privateEventSource: CGEventSource?
     private var activeHeldKeyCombos: Set<KeyCombo> = []
+    private var activeHeldMouseButtons: Set<MouseClickButton> = []
+    private var lastScrollTimestamp: TimeInterval?
+    private var lastScrollPositive: Bool?
 
     public init() {
         // 使用独立 .privateState 状态源，避免物理键盘修饰位与合成事件相互污染
@@ -280,14 +372,21 @@ public final class SystemActionExecutor {
         return downOK && upOK
     }
 
-    /// 紧急释放所有尚未松开的合成键盘快捷键（断连或休眠时调用防卡键）。
+    /// 紧急释放所有尚未松开的合成键盘快捷键与鼠标按键（断连或休眠时调用防卡键）。
     public func releaseAllHeldKeys() {
-        guard !activeHeldKeyCombos.isEmpty else { return }
-        let pending = activeHeldKeyCombos
+        let pendingKeys = activeHeldKeyCombos
+        let pendingMouse = activeHeldMouseButtons
         activeHeldKeyCombos.removeAll()
-        guard isAccessibilityTrusted(prompt: false) else { return }
-        for combo in pending {
+        activeHeldMouseButtons.removeAll()
+        guard (!pendingKeys.isEmpty || !pendingMouse.isEmpty),
+              isAccessibilityTrusted(prompt: false)
+        else { return }
+
+        for combo in pendingKeys {
             _ = postKeyboardCGEvent(combo, keyDown: false)
+        }
+        for button in pendingMouse {
+            _ = postMouseButtonCGEvent(button, buttonDown: false)
         }
     }
 
@@ -309,6 +408,181 @@ public final class SystemActionExecutor {
             }
         }
         event.flags = flags
+        event.post(tap: .cghidEventTap)
+        return true
+    }
+
+    // MARK: - Trackpad Smooth Scroll & Mouse Wheel Synthesis
+
+    /// 发送一次滚轮 / 双指滑动滚动事件。
+    /// - Parameters:
+    ///   - isPositiveStep: 硬件正向步进（对 `Scroll` 为向上拨 `0x49`，对 `Knob` 为顺时针 `0x44`）。
+    ///   - config: 滚动模式、方向、灵敏度与加速配置。
+    ///   - timestamp: 硬件事件时间戳（用于动态连滚加速计算）。
+    @discardableResult
+    public func sendMouseScroll(
+        isPositiveStep: Bool,
+        config: MouseScrollConfig,
+        timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime,
+        promptIfUntrusted: Bool = true
+    ) -> Bool {
+        guard isAccessibilityTrusted(prompt: promptIfUntrusted) else {
+            return false
+        }
+
+        var accelMultiplier: Double = 1.0
+        if config.dynamicAcceleration {
+            if let prevTime = lastScrollTimestamp,
+               let prevPos = lastScrollPositive,
+               prevPos == isPositiveStep
+            {
+                let dt = max(0, timestamp - prevTime)
+                if dt < 0.045 {
+                    accelMultiplier = 2.4
+                } else if dt < 0.095 {
+                    accelMultiplier = 1.55
+                }
+            }
+            lastScrollTimestamp = timestamp
+            lastScrollPositive = isPositiveStep
+        } else {
+            lastScrollTimestamp = nil
+            lastScrollPositive = nil
+        }
+
+        let effectivePositive = config.invertDirection ? !isPositiveStep : isPositiveStep
+        let sign: Int32 = effectivePositive ? 1 : -1
+        let clampedSpeed = min(5, max(1, config.speed))
+
+        switch config.mode {
+        case .mouseWheelLine:
+            let baseLinesTable: [Int] = [1, 2, 3, 5, 8]
+            let rawLines = Double(baseLinesTable[clampedSpeed - 1]) * accelMultiplier
+            let stepLines = Int32(max(1, Int(rawLines.rounded()))) * sign
+            return postScrollCGEvent(units: .line, delta: stepLines, axis: config.axis)
+
+        case .trackpadSmooth:
+            let basePixelsTable: [Double] = [28, 46, 68, 96, 136]
+            let totalPixels = basePixelsTable[clampedSpeed - 1] * accelMultiplier
+            // 拆分为 4 个 120Hz 微帧（权重之和 = 1.0），营造原生触控板丝滑滚动手感
+            let weights: [Double] = [0.32, 0.30, 0.23, 0.15]
+            let slices: [Int32] = weights.map { w in
+                let px = max(1, Int((totalPixels * w).rounded()))
+                return Int32(px) * sign
+            }
+
+            let ok = postScrollCGEvent(units: .pixel, delta: slices[0], axis: config.axis)
+            let axis = config.axis
+            Task { @MainActor [weak self] in
+                for slice in slices.dropFirst() {
+                    try? await Task.sleep(for: .milliseconds(8))
+                    guard let self else { return }
+                    _ = self.postScrollCGEvent(units: .pixel, delta: slice, axis: axis)
+                }
+            }
+            return ok
+        }
+    }
+
+    private func postScrollCGEvent(
+        units: CGScrollEventUnit,
+        delta: Int32,
+        axis: MouseScrollConfig.Axis
+    ) -> Bool {
+        let source = privateEventSource ?? CGEventSource(stateID: .privateState)
+        let wheel1: Int32 = (axis == .vertical) ? delta : 0
+        let wheel2: Int32 = (axis == .horizontal) ? delta : 0
+        guard let event = CGEvent(
+            scrollWheelEvent2Source: source,
+            units: units,
+            wheelCount: 2,
+            wheel1: wheel1,
+            wheel2: wheel2,
+            wheel3: 0
+        ) else {
+            return false
+        }
+        event.flags = []
+        event.post(tap: .cghidEventTap)
+        return true
+    }
+
+    // MARK: - Mouse Button Click & Hold Synthesis (Middle / Left / Right / Side)
+
+    @discardableResult
+    public func sendMouseButtonDown(_ button: MouseClickButton, promptIfUntrusted: Bool = true) -> Bool {
+        guard isAccessibilityTrusted(prompt: promptIfUntrusted) else {
+            return false
+        }
+        guard postMouseButtonCGEvent(button, buttonDown: true) else {
+            return false
+        }
+        activeHeldMouseButtons.insert(button)
+        return true
+    }
+
+    @discardableResult
+    public func sendMouseButtonUp(_ button: MouseClickButton) -> Bool {
+        activeHeldMouseButtons.remove(button)
+        guard isAccessibilityTrusted(prompt: false) else {
+            return false
+        }
+        return postMouseButtonCGEvent(button, buttonDown: false)
+    }
+
+    @discardableResult
+    public func sendMouseButtonClick(_ button: MouseClickButton, promptIfUntrusted: Bool = true) -> Bool {
+        guard isAccessibilityTrusted(prompt: promptIfUntrusted) else {
+            return false
+        }
+        let downOK = postMouseButtonCGEvent(button, buttonDown: true)
+        let upOK = postMouseButtonCGEvent(button, buttonDown: false)
+        return downOK && upOK
+    }
+
+    private func postMouseButtonCGEvent(_ button: MouseClickButton, buttonDown: Bool) -> Bool {
+        let source = privateEventSource ?? CGEventSource(stateID: .privateState)
+        let cursorPos = CGEvent(source: nil)?.location ?? .zero
+
+        let mouseType: CGEventType
+        let cgButton: CGMouseButton
+        var customButtonNumber: Int64?
+
+        switch button {
+        case .left:
+            mouseType = buttonDown ? .leftMouseDown : .leftMouseUp
+            cgButton = .left
+        case .right:
+            mouseType = buttonDown ? .rightMouseDown : .rightMouseUp
+            cgButton = .right
+        case .middle:
+            mouseType = buttonDown ? .otherMouseDown : .otherMouseUp
+            cgButton = .center
+            customButtonNumber = 2
+        case .back:
+            mouseType = buttonDown ? .otherMouseDown : .otherMouseUp
+            cgButton = .center
+            customButtonNumber = 3
+        case .forward:
+            mouseType = buttonDown ? .otherMouseDown : .otherMouseUp
+            cgButton = .center
+            customButtonNumber = 4
+        }
+
+        guard let event = CGEvent(
+            mouseEventSource: source,
+            mouseType: mouseType,
+            mouseCursorPosition: cursorPos,
+            mouseButton: cgButton
+        ) else {
+            return false
+        }
+        if let customButtonNumber {
+            event.setIntegerValueField(.mouseEventButtonNumber, value: customButtonNumber)
+        }
+        if buttonDown {
+            event.setIntegerValueField(.mouseEventClickState, value: 1)
+        }
         event.post(tap: .cghidEventTap)
         return true
     }

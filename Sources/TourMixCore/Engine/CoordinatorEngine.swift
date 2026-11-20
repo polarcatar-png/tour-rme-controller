@@ -619,8 +619,13 @@ public final class CoordinatorEngine {
 
         case .buttonUp(let button, let modifier):
             let action = resolveButtonAction(in: profile, button: button, modifier: modifier)
-            if case .keyShortcut(let combo) = action {
+            switch action {
+            case .keyShortcut(let combo):
                 _ = actionExecutor.sendKeyComboUp(combo)
+            case .mouseClick(let mouseBtn):
+                _ = actionExecutor.sendMouseButtonUp(mouseBtn)
+            default:
+                break
             }
 
         case .buttonTapOnRelease(let button):
@@ -728,15 +733,28 @@ public final class CoordinatorEngine {
             let combo = direction.isClockwise ? cw : ccw
             _ = actionExecutor.sendKeyComboTap(combo)
 
+        case .mouseScroll(let scrollConfig):
+            _ = actionExecutor.sendMouseScroll(
+                isPositiveStep: direction.isClockwise,
+                config: scrollConfig,
+                timestamp: timestamp
+            )
+
         case .systemVolume:
             actionExecutor.triggerMediaKey(direction.isClockwise ? .volumeUp : .volumeDown)
         }
     }
 
     private func executeButtonDownAction(_ action: ButtonBindingAction) {
-        if case .keyShortcut(let combo) = action {
+        switch action {
+        case .keyShortcut(let combo):
             _ = actionExecutor.sendKeyComboDown(combo)
             return
+        case .mouseClick(let mouseBtn):
+            _ = actionExecutor.sendMouseButtonDown(mouseBtn)
+            return
+        default:
+            break
         }
         executeOneShotButtonAction(action)
     }
@@ -829,6 +847,9 @@ public final class CoordinatorEngine {
 
         case .keyShortcut(let combo):
             _ = actionExecutor.sendKeyComboTap(combo)
+
+        case .mouseClick(let mouseBtn):
+            _ = actionExecutor.sendMouseButtonClick(mouseBtn)
 
         case .mediaKey(let media):
             actionExecutor.triggerMediaKey(media)

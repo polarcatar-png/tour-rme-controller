@@ -180,4 +180,29 @@ final class ControlStateMachineTests: XCTestCase {
         XCTAssertTrue(standaloneOption.isStandaloneModifierKey)
         XCTAssertEqual(KeyCombo.standaloneModifierFlag(for: 0x3A), .maskAlternate)
     }
+
+    func testMouseScrollAndMouseClickBindingsCodableAndSummary() throws {
+        var profile = ProfileConfig.factoryDefault
+        let scrollCfg = MouseScrollConfig(
+            mode: .trackpadSmooth,
+            axis: .vertical,
+            speed: 4,
+            invertDirection: true,
+            dynamicAcceleration: true
+        )
+        profile.rotaryBindings[.scroll] = .mouseScroll(scrollCfg)
+        profile.buttonBindings[.scrollClick] = .mouseClick(.middle)
+
+        XCTAssertTrue(profile.rotaryBindings[.scroll]?.requiresAccessibility == true)
+        XCTAssertTrue(profile.buttonBindings[.scrollClick]?.requiresAccessibility == true)
+        XCTAssertTrue(profile.containsKeyboardShortcutBindings || profile.buttonBindings[.scrollClick]?.requiresAccessibility == true)
+
+        let summary = profile.bindingSummary(for: .scroll) { _, _ in "AN 1/2" }
+        XCTAssertEqual(summary.primary, "平滑上下滚动")
+        XCTAssertEqual(summary.secondary, "鼠标中键")
+
+        let data = try JSONEncoder().encode(profile)
+        let decoded = try JSONDecoder().decode(ProfileConfig.self, from: data)
+        XCTAssertEqual(decoded, profile)
+    }
 }

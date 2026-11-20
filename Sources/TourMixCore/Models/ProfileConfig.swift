@@ -16,6 +16,7 @@ public enum RotaryBindingAction: Codable, Equatable, Sendable {
         safetyClamp0dB: Bool
     )
     case keyPair(cw: KeyCombo, ccw: KeyCombo)
+    case mouseScroll(MouseScrollConfig)
     case systemVolume
 
     public var isNone: Bool {
@@ -24,8 +25,12 @@ public enum RotaryBindingAction: Codable, Equatable, Sendable {
     }
 
     public var requiresAccessibility: Bool {
-        if case .keyPair = self { return true }
-        return false
+        switch self {
+        case .keyPair, .mouseScroll:
+            return true
+        default:
+            return false
+        }
     }
 
     /// 生成面向画布徽章与检查器的简明中文摘要；未绑定返回 `nil`。
@@ -41,6 +46,9 @@ public enum RotaryBindingAction: Codable, Equatable, Sendable {
             return "\(src) → \(dst)"
         case .keyPair(let cw, let ccw):
             return "\(ccw.displayLabel) / \(cw.displayLabel)"
+        case .mouseScroll(let cfg):
+            let axisText = cfg.axis == .vertical ? "上下" : "左右"
+            return cfg.mode == .trackpadSmooth ? "平滑\(axisText)滚动" : "鼠标\(axisText)滚轮"
         case .systemVolume:
             return "系统音量"
         }
@@ -58,6 +66,7 @@ public enum ButtonBindingAction: Codable, Equatable, Sendable {
     case rmeLayout(Int)   // 1...6 (1-based)
     case rmeToggleWindow
     case keyShortcut(KeyCombo)
+    case mouseClick(MouseClickButton)
     case mediaKey(MediaKeyAction)
     case shellCommand(String)
     case appleScript(String)
@@ -69,10 +78,14 @@ public enum ButtonBindingAction: Codable, Equatable, Sendable {
         return false
     }
 
-    /// 是否需要 macOS 辅助功能权限（仅键盘快捷键合成需要）。
+    /// 是否需要 macOS 辅助功能权限（键盘快捷键或鼠标点击合成需要）。
     public var requiresAccessibility: Bool {
-        if case .keyShortcut = self { return true }
-        return false
+        switch self {
+        case .keyShortcut, .mouseClick:
+            return true
+        default:
+            return false
+        }
     }
 
     /// 生成面向画布徽章与检查器的简明中文摘要；未绑定返回 `nil`。
@@ -103,6 +116,8 @@ public enum ButtonBindingAction: Codable, Equatable, Sendable {
             return "TotalMix 窗口"
         case .keyShortcut(let combo):
             return combo.displayLabel
+        case .mouseClick(let btn):
+            return btn.shortSummary
         case .mediaKey(let media):
             return media.displayName
         case .shellCommand(let cmd):

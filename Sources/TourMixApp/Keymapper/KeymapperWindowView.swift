@@ -600,6 +600,7 @@ public struct KeymapperWindowView: View {
         case none = "未绑定（留空）"
         case rmeOutput = "RME 硬件输出通道音量"
         case rmeSubmix = "RME 子混音矩阵发送音量"
+        case mouseScroll = "触控板双指滑动 / 鼠标滚轮"
         case systemVolume = "macOS 系统音量"
         case keyPair = "自定义正反转按键 / 快捷键"
 
@@ -619,6 +620,7 @@ public struct KeymapperWindowView: View {
         case .none: return .none
         case .rmeOutputFader: return .rmeOutput
         case .rmeSubmixFader: return .rmeSubmix
+        case .mouseScroll: return .mouseScroll
         case .systemVolume: return .systemVolume
         case .keyPair: return .keyPair
         }
@@ -680,6 +682,8 @@ public struct KeymapperWindowView: View {
                                 .rmeOutputFader(channelIndex: 0, ballistics: .standard, safetyClamp0dB: true)
                             case .rmeSubmix:
                                 .rmeSubmixFader(sourceBus: .playback, sourceIndex: 0, outputIndex: 0, ballistics: .standard, safetyClamp0dB: true)
+                            case .mouseScroll:
+                                .mouseScroll(.standard)
                             case .systemVolume:
                                 .systemVolume
                             case .keyPair:
@@ -804,6 +808,94 @@ public struct KeymapperWindowView: View {
                     .toggleStyle(.switch)
                     .controlSize(.small)
 
+                case .mouseScroll(let scrollCfg):
+                    Divider().overlay(Color.white.opacity(0.08))
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker(
+                            "滚动手感模式",
+                            selection: Binding<MouseScrollConfig.Mode>(
+                                get: { scrollCfg.mode },
+                                set: { newMode in
+                                    var updated = scrollCfg
+                                    updated.mode = newMode
+                                    engine.setRotaryBinding(rotary, modifier: editingModifier, action: .mouseScroll(updated))
+                                }
+                            )
+                        ) {
+                            ForEach(MouseScrollConfig.Mode.allCases) { item in
+                                Text(item.displayName).tag(item)
+                            }
+                        }
+
+                        Picker(
+                            "滚动方向轴",
+                            selection: Binding<MouseScrollConfig.Axis>(
+                                get: { scrollCfg.axis },
+                                set: { newAxis in
+                                    var updated = scrollCfg
+                                    updated.axis = newAxis
+                                    engine.setRotaryBinding(rotary, modifier: editingModifier, action: .mouseScroll(updated))
+                                }
+                            )
+                        ) {
+                            ForEach(MouseScrollConfig.Axis.allCases) { item in
+                                Text(item.displayName).tag(item)
+                            }
+                        }
+
+                        HStack(spacing: 6) {
+                            Text("每格步幅速度：")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.white.opacity(0.82))
+                            ForEach([(1, "1 慢"), (2, "2 柔"), (3, "3 标准"), (4, "4 快"), (5, "5 极快")], id: \.0) { tier, label in
+                                Button(label) {
+                                    var updated = scrollCfg
+                                    updated.speed = tier
+                                    engine.setRotaryBinding(rotary, modifier: editingModifier, action: .mouseScroll(updated))
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(scrollCfg.speed == tier ? .accentColor : .secondary)
+                                .controlSize(.small)
+                            }
+                        }
+
+                        Toggle(
+                            "快速连续拨动时自动惯性加速（长网页/长文档快速翻页）",
+                            isOn: Binding(
+                                get: { scrollCfg.dynamicAcceleration },
+                                set: { val in
+                                    var updated = scrollCfg
+                                    updated.dynamicAcceleration = val
+                                    engine.setRotaryBinding(rotary, modifier: editingModifier, action: .mouseScroll(updated))
+                                }
+                            )
+                        )
+                        .font(.system(size: 12))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+
+                        Toggle(
+                            "反转上下滚动方向（适配个人「自然滚动」习惯）",
+                            isOn: Binding(
+                                get: { scrollCfg.invertDirection },
+                                set: { val in
+                                    var updated = scrollCfg
+                                    updated.invertDirection = val
+                                    engine.setRotaryBinding(rotary, modifier: editingModifier, action: .mouseScroll(updated))
+                                }
+                            )
+                        )
+                        .font(.system(size: 12))
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+
+                        Text("小提示：若想同时获得完整鼠标中键体验，可在下方「按压动作」卡片中选择「鼠标中键 / 左键 / 右键点击」。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.55))
+
+                        accessibilityPermissionBannerIfNeeded
+                    }
+
                 case .systemVolume:
                     Text("通过 macOS 原生媒体事件直接调节当前系统默认音频输出音量（无需辅助功能权限）。")
                         .font(.system(size: 11.5))
@@ -901,6 +993,7 @@ public struct KeymapperWindowView: View {
         case rmeLayout = "RME 布局调用 (Layout 1..6)"
         case rmeToggleWindow = "显示 / 隐藏 TotalMix 窗口"
         case keyShortcut = "电脑键盘按键 / 快捷键"
+        case mouseClick = "鼠标中键 / 左键 / 右键点击"
         case mediaKey = "系统媒体键 (播放 / 切歌 / 音量)"
         case cycleProfile = "切换下一套预设"
         case openKeymapper = "打开 TourMix 控制台窗口"
@@ -921,6 +1014,7 @@ public struct KeymapperWindowView: View {
         case .rmeLayout: return .rmeLayout
         case .rmeToggleWindow: return .rmeToggleWindow
         case .keyShortcut: return .keyShortcut
+        case .mouseClick: return .mouseClick
         case .mediaKey: return .mediaKey
         case .cycleProfile: return .cycleProfile
         case .openKeymapper: return .openKeymapper
@@ -976,6 +1070,7 @@ public struct KeymapperWindowView: View {
                             case .rmeLayout: .rmeLayout(1)
                             case .rmeToggleWindow: .rmeToggleWindow
                             case .keyShortcut: .keyShortcut(KeyCombo(keyCode: 0x06, command: true)) // Cmd+Z
+                            case .mouseClick: .mouseClick(.middle)
                             case .mediaKey: .mediaKey(.playPause)
                             case .cycleProfile: .cycleProfile
                             case .openKeymapper: .openKeymapper
@@ -1147,6 +1242,26 @@ public struct KeymapperWindowView: View {
                     }
                 }
                 Text("支持直接录入任意单个按键（如 Space、B、Delete、Esc、方向键）、单独修饰键（点按一下 Shift / Option / Command 即可绑定按住生效）或组合快捷键，也可点右侧键盘菜单直接点选。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.55))
+                accessibilityPermissionBannerIfNeeded
+            }
+
+        case .mouseClick(let mouseBtn):
+            Divider().overlay(Color.white.opacity(0.08))
+            VStack(alignment: .leading, spacing: 8) {
+                Picker(
+                    "鼠标按键",
+                    selection: Binding<MouseClickButton>(
+                        get: { mouseBtn },
+                        set: { onUpdate(.mouseClick($0)) }
+                    )
+                ) {
+                    ForEach(MouseClickButton.allCases) { item in
+                        Text(item.displayName).tag(item)
+                    }
+                }
+                Text("支持单击与按住持续生效（例如将 Scroll 按压设为「鼠标中键」，既能单击关闭网页标签/后台打开链接，也能按住滚轮在 DAW / Figma / 3D 软件中拖拽平移画布）。")
                     .font(.system(size: 11))
                     .foregroundStyle(Color.white.opacity(0.55))
                 accessibilityPermissionBannerIfNeeded
