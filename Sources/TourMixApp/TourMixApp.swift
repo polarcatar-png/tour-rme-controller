@@ -30,6 +30,11 @@ final class TourMixAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let appIcon = NSImage(contentsOf: iconURL)
+        {
+            NSApp.applicationIconImage = appIcon
+        }
 
         let engine = CoordinatorEngine()
         let launchManager = LaunchAtLoginManager()
