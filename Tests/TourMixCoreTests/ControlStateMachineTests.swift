@@ -154,4 +154,30 @@ final class ControlStateMachineTests: XCTestCase {
         XCTAssertEqual(MediaKeyAction.nextTrack.nxKeyType, 17)
         XCTAssertEqual(MediaKeyAction.previousTrack.nxKeyType, 18)
     }
+
+    func testSingleKeyAndStandaloneModifierKeyCombos() {
+        let singleB = KeyCombo(keyCode: 0x0B)
+        XCTAssertEqual(singleB.displayLabel, "B")
+        XCTAssertTrue(singleB.cgEventFlags.isEmpty)
+        XCTAssertFalse(singleB.isStandaloneModifierKey)
+
+        let singleSpace = KeyCombo(keyCode: 0x31)
+        XCTAssertEqual(singleSpace.displayLabel, "Space")
+
+        let singleDelete = KeyCombo(keyCode: 0x33)
+        XCTAssertEqual(singleDelete.displayLabel, "⌫")
+
+        let singleEsc = KeyCombo(keyCode: 0x35)
+        XCTAssertEqual(singleEsc.displayLabel, "⎋")
+
+        let standaloneShift = KeyCombo(keyCode: 0x38)
+        XCTAssertEqual(standaloneShift.displayLabel, "⇧ Shift")
+        XCTAssertTrue(standaloneShift.isStandaloneModifierKey)
+        XCTAssertEqual(KeyCombo.standaloneModifierFlag(for: 0x38), .maskShift)
+
+        let standaloneOption = KeyCombo(keyCode: 0x3A)
+        XCTAssertEqual(standaloneOption.displayLabel, "⌥ Option")
+        XCTAssertTrue(standaloneOption.isStandaloneModifierKey)
+        XCTAssertEqual(KeyCombo.standaloneModifierFlag(for: 0x3A), .maskAlternate)
+    }
 }

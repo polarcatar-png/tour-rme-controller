@@ -37,6 +37,24 @@ public struct KeyCombo: Codable, Equatable, Hashable, Sendable {
         }
     }
 
+    /// 判断该键码本身是否为独立的修饰键（如单独绑定 Left Shift / Option / Command / Control）。
+    public static func standaloneModifierFlag(for keyCode: UInt16) -> CGEventFlags? {
+        switch keyCode {
+        case 0x37, 0x36: return .maskCommand   // 55 Left Cmd, 54 Right Cmd
+        case 0x38, 0x3C: return .maskShift     // 56 Left Shift, 60 Right Shift
+        case 0x3A, 0x3D: return .maskAlternate // 58 Left Option, 61 Right Option
+        case 0x3B, 0x3E: return .maskControl   // 59 Left Control, 62 Right Control
+        case 0x39: return .maskAlphaShift      // 57 Caps Lock
+        case 0x3F: return .maskSecondaryFn     // 63 Fn
+        default: return nil
+        }
+    }
+
+    /// 该绑定是否为不带额外组合修饰位的纯单修饰键（如单独按住 TourBox 键等于按住 Shift）。
+    public var isStandaloneModifierKey: Bool {
+        Self.standaloneModifierFlag(for: keyCode) != nil && !control && !option && !shift && !command
+    }
+
     /// 对应的 `CGEventFlags` 修饰掩码。
     public var cgEventFlags: CGEventFlags {
         var flags: CGEventFlags = []
@@ -47,7 +65,7 @@ public struct KeyCombo: Codable, Equatable, Hashable, Sendable {
         return flags
     }
 
-    /// 将修饰位与虚拟键码格式化为标准 macOS 快捷键符号串（如 `"⌃⌥⌘Z"`）。
+    /// 将修饰位与虚拟键码格式化为标准 macOS 按键/快捷键符号串（支持单键如 `"B"`、`"Space"`、`"⇧ Shift"` 及组合键 `"⌃⌥⌘Z"`）。
     public static func formatDisplayLabel(
         keyCode: UInt16,
         control: Bool,
@@ -55,6 +73,9 @@ public struct KeyCombo: Codable, Equatable, Hashable, Sendable {
         shift: Bool,
         command: Bool
     ) -> String {
+        if standaloneModifierFlag(for: keyCode) != nil && !control && !option && !shift && !command {
+            return keySymbol(for: keyCode)
+        }
         var parts = ""
         if control { parts += "⌃" }
         if option { parts += "⌥" }
@@ -73,6 +94,13 @@ public struct KeyCombo: Codable, Equatable, Hashable, Sendable {
     }
 
     private static let virtualKeySymbols: [UInt16: String] = [
+        // Standalone Modifier Keys
+        0x37: "⌘ Command", 0x36: "⌘ Right Cmd",
+        0x38: "⇧ Shift", 0x3C: "⇧ Right Shift",
+        0x3A: "⌥ Option", 0x3D: "⌥ Right Opt",
+        0x3B: "⌃ Control", 0x3E: "⌃ Right Ctrl",
+        0x39: "⇪ CapsLock", 0x3F: "fn",
+
         // ANSI Letters & Digits
         0x00: "A", 0x01: "S", 0x02: "D", 0x03: "F", 0x04: "H", 0x05: "G",
         0x06: "Z", 0x07: "X", 0x08: "C", 0x09: "V", 0x0B: "B", 0x0C: "Q",
@@ -272,7 +300,15 @@ public final class SystemActionExecutor {
         ) else {
             return false
         }
-        event.flags = combo.cgEventFlags
+        var flags = combo.cgEventFlags
+        if let selfModFlag = KeyCombo.standaloneModifierFlag(for: combo.keyCode) {
+            if keyDown {
+                flags.insert(selfModFlag)
+            } else {
+                flags.remove(selfModFlag)
+            }
+        }
+        event.flags = flags
         event.post(tap: .cghidEventTap)
         return true
     }

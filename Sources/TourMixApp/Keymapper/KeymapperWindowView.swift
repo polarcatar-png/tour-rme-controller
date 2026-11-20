@@ -601,7 +601,7 @@ public struct KeymapperWindowView: View {
         case rmeOutput = "RME 硬件输出通道音量"
         case rmeSubmix = "RME 子混音矩阵发送音量"
         case systemVolume = "macOS 系统音量"
-        case keyPair = "自定义正反转快捷键对"
+        case keyPair = "自定义正反转按键 / 快捷键"
 
         var id: String { rawValue }
     }
@@ -900,7 +900,7 @@ public struct KeymapperWindowView: View {
         case rmeSnapshot = "RME 快照调用 (Snapshot 1..8)"
         case rmeLayout = "RME 布局调用 (Layout 1..6)"
         case rmeToggleWindow = "显示 / 隐藏 TotalMix 窗口"
-        case keyShortcut = "电脑键盘快捷键"
+        case keyShortcut = "电脑键盘按键 / 快捷键"
         case mediaKey = "系统媒体键 (播放 / 切歌 / 音量)"
         case cycleProfile = "切换下一套预设"
         case openKeymapper = "打开 TourMix 控制台窗口"
@@ -1136,7 +1136,7 @@ public struct KeymapperWindowView: View {
             Divider().overlay(Color.white.opacity(0.08))
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("触发快捷键：")
+                    Text("绑定按键：")
                         .font(.system(size: 12))
                     ShortcutRecorderView(combo: combo) { newCombo in
                         if let newCombo {
@@ -1146,6 +1146,9 @@ public struct KeymapperWindowView: View {
                         }
                     }
                 }
+                Text("支持直接录入任意单个按键（如 Space、B、Delete、Esc、方向键）、单独修饰键（点按一下 Shift / Option / Command 即可绑定按住生效）或组合快捷键，也可点右侧键盘菜单直接点选。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.55))
                 accessibilityPermissionBannerIfNeeded
             }
 
