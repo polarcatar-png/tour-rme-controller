@@ -19,7 +19,13 @@ enum TourMixMain {
 }
 
 @MainActor
-final class TourMixAppDelegate: NSObject, NSApplicationDelegate {
+final class TourMixAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+    private struct StatusBarRenderState: Equatable {
+        let bothOnline: Bool
+        let anyOnline: Bool
+        let dbText: String?
+    }
+
     private var engine: CoordinatorEngine!
     private var launchManager: LaunchAtLoginManager!
     private var hudController: HUDPanelController!
@@ -27,6 +33,20 @@ final class TourMixAppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
+    private var lastStatusBarRenderState: StatusBarRenderState?
+
+    private lazy var onlineSymbolImage: NSImage? = Self.makeTemplateSymbolImage(named: "dial.medium.fill")
+    private lazy var offlineSymbolImage: NSImage? = Self.makeTemplateSymbolImage(named: "dial.medium")
+
+    private static func makeTemplateSymbolImage(named symbolName: String) -> NSImage? {
+        guard let baseImage = NSImage(systemSymbolName: symbolName, accessibilityDescription: "TourMix") else {
+            return nil
+        }
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        let configured = baseImage.withSymbolConfiguration(config) ?? baseImage
+        configured.isTemplate = true
+        return configured
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -68,7 +88,10 @@ final class TourMixAppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.appearance = NSAppearance(named: .darkAqua)
+        popover.delegate = self
+    }
 
+    private func makePopoverHostingController() -> NSViewController {
         let popoverRoot = MenuBarPopoverView(
             engine: engine,
             launchManager: launchManager,
@@ -82,7 +105,14 @@ final class TourMixAppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
             }
         )
-        popover.contentViewController = NSHostingController(rootView: popoverRoot)
+        return NSHostingController(rootView: popoverRoot)
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.popover.isShown else { return }
+            self.popover.contentViewController = nil
+        }
     }
 
     private func setupStatusItem() {
@@ -136,17 +166,20 @@ final class TourMixAppDelegate: NSObject, NSApplicationDelegate {
 
         let bothOnline = engine.tourBoxState.isConnected && engine.totalMix.isConnected
         let anyOnline = engine.tourBoxState.isConnected || engine.totalMix.isConnected
-        let symbolName = bothOnline ? "dial.medium.fill" : "dial.medium"
+        let dbText = engine.menuBarStatusDbText
 
-        if let baseImage = NSImage(systemSymbolName: symbolName, accessibilityDescription: "TourMix") {
-            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-            let configured = baseImage.withSymbolConfiguration(config) ?? baseImage
-            configured.isTemplate = true
-            button.image = configured
-            button.alphaValue = anyOnline ? 1.0 : 0.78
-        }
+        let nextState = StatusBarRenderState(
+            bothOnline: bothOnline,
+            anyOnline: anyOnline,
+            dbText: dbText
+        )
+        guard nextState != lastStatusBarRenderState else { return }
+        lastStatusBarRenderState = nextState
 
-        if let dbText = engine.menuBarStatusDbText {
+        button.image = bothOnline ? onlineSymbolImage : offlineSymbolImage
+        button.alphaValue = anyOnline ? 1.0 : 0.78
+
+        if let dbText {
             let font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .medium)
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: font,
@@ -183,6 +216,9 @@ final class TourMixAppDelegate: NSObject, NSApplicationDelegate {
             popover.performClose(button)
         } else {
             launchManager.refresh()
+            if popover.contentViewController == nil {
+                popover.contentViewController = makePopoverHostingController()
+            }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }

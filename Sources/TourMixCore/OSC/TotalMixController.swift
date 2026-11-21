@@ -58,7 +58,8 @@ public final class TotalMixController {
     /// DSP 负载百分比（若硬件支持）。
     public private(set) var dspLoad: Double?
 
-    /// 最近一次收到合法 OSC 消息的系统运行时间戳。
+    /// 最近一次收到合法 OSC 消息的系统运行时间戳（不触发 SwiftUI 视图刷新）。
+    @ObservationIgnored
     public private(set) var lastMessageTimestamp: TimeInterval?
 
     /// 18+ 路硬件输入通道状态（`0-based`）。
@@ -82,12 +83,17 @@ public final class TotalMixController {
     /// TotalMix 主窗口显隐估计状态（用于 `/showwindow` 切换）。
     public private(set) var isTotalMixWindowVisible: Bool = true
 
+    /// 是否按需采集 OSC 收发报文诊断日志（仅诊断面板打开时开启，平时保持关闭以降低后台堆分配）。
+    @ObservationIgnored
+    public private(set) var isDiagnosticsCaptureEnabled: Bool = false
+
     /// 最近收发的 OSC 报文诊断环形缓冲（最多保留 120 条）。
     public private(set) var recentDiagnostics: [OSCDiagnosticEntry] = []
 
     // MARK: - Timing Configuration
 
     public let heartbeatIntervalSeconds: Double
+    public let idleConnectedHeartbeatIntervalSeconds: Double
     public let offlineProbeTimeoutSeconds: Double
     public let optimisticWindowSeconds: Double
     public let settleSyncDebounceSeconds: Double
@@ -160,16 +166,18 @@ public final class TotalMixController {
         incomingPort: UInt16 = 9001,
         configDirectoryURL: URL? = nil,
         heartbeatIntervalSeconds: Double = 3.0,
+        idleConnectedHeartbeatIntervalSeconds: Double = 10.0,
         offlineProbeTimeoutSeconds: Double = 1.2,
         optimisticWindowSeconds: Double = 0.220,
         settleSyncDebounceSeconds: Double = 0.250,
-        staleConnectionTimeoutSeconds: Double = 7.5
+        staleConnectionTimeoutSeconds: Double = 25.0
     ) {
         self.host = host
         self.outgoingPort = outgoingPort
         self.incomingPort = incomingPort
         self.configDirectoryURL = configDirectoryURL
         self.heartbeatIntervalSeconds = heartbeatIntervalSeconds
+        self.idleConnectedHeartbeatIntervalSeconds = idleConnectedHeartbeatIntervalSeconds
         self.offlineProbeTimeoutSeconds = offlineProbeTimeoutSeconds
         self.optimisticWindowSeconds = optimisticWindowSeconds
         self.settleSyncDebounceSeconds = settleSyncDebounceSeconds
@@ -194,10 +202,11 @@ public final class TotalMixController {
         incomingPort: UInt16 = 9001,
         configDirectoryURL: URL? = nil,
         heartbeatIntervalSeconds: Double = 3.0,
+        idleConnectedHeartbeatIntervalSeconds: Double = 10.0,
         offlineProbeTimeoutSeconds: Double = 1.2,
         optimisticWindowSeconds: Double = 0.220,
         settleSyncDebounceSeconds: Double = 0.250,
-        staleConnectionTimeoutSeconds: Double = 7.5,
+        staleConnectionTimeoutSeconds: Double = 25.0,
         nowProvider: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         sendHandler: @escaping @MainActor (OSCMessage) -> Void
     ) {
@@ -206,6 +215,7 @@ public final class TotalMixController {
         self.incomingPort = incomingPort
         self.configDirectoryURL = configDirectoryURL
         self.heartbeatIntervalSeconds = heartbeatIntervalSeconds
+        self.idleConnectedHeartbeatIntervalSeconds = idleConnectedHeartbeatIntervalSeconds
         self.offlineProbeTimeoutSeconds = offlineProbeTimeoutSeconds
         self.optimisticWindowSeconds = optimisticWindowSeconds
         self.settleSyncDebounceSeconds = settleSyncDebounceSeconds
@@ -225,7 +235,7 @@ public final class TotalMixController {
 
     // MARK: - Lifecycle & Transport Control
 
-    /// 启动 OSC 监听、立即发送首帧 `/sendstate 1.0f`，并开启 `3.0 s` 周期心跳与离线诊断超时检查。
+    /// 启动 OSC 监听、立即发送首帧 `/sendstate 1.0f`，并开启自适应周期心跳（断线探测 `3s` / 在线稳态 `10s`）与离线诊断超时检查。
     public func start() {
         stopBackgroundTasks()
 
@@ -239,23 +249,29 @@ public final class TotalMixController {
                 }
             }
         } else {
-            transportState = .listening(
+            let listeningState = OSCTransportState.listening(
                 localHost: "127.0.0.1",
                 incomingPort: incomingPort,
                 remoteHost: host,
                 outgoingPort: outgoingPort
             )
+            if transportState != listeningState {
+                transportState = listeningState
+            }
         }
 
         // 启动时立即探测一次状态
         requestStateHeartbeat()
         scheduleOfflineProbeCheck()
 
-        let interval = max(0.1, heartbeatIntervalSeconds)
         heartbeatTask = Task { [weak self] in
             while !Task.isCancelled {
+                guard let self else { break }
+                let interval = self.isConnected
+                    ? max(self.heartbeatIntervalSeconds, self.idleConnectedHeartbeatIntervalSeconds)
+                    : max(0.1, self.heartbeatIntervalSeconds)
                 try? await Task.sleep(for: .seconds(interval))
-                guard !Task.isCancelled, let self else { break }
+                guard !Task.isCancelled else { break }
                 self.performHeartbeatTick()
             }
         }
@@ -324,7 +340,9 @@ public final class TotalMixController {
     /// 手动刷新离线 XML 诊断信息（仅在 `!isConnected` 时保留结果）。
     public func refreshOfflineDiagnostic() {
         guard !isConnected else {
-            offlineDiagnostic = nil
+            if offlineDiagnostic != nil {
+                offlineDiagnostic = nil
+            }
             return
         }
         let diag = TotalMixConfigInspector.inspect(
@@ -332,9 +350,22 @@ public final class TotalMixController {
             expectedOutgoingPort: outgoingPort,
             expectedIncomingPort: incomingPort
         )
-        offlineDiagnostic = diag
-        if !hasReceivedMainOutFromOSC, let xmlMainOut = diag.mainChannelIndex {
+        if offlineDiagnostic != diag {
+            offlineDiagnostic = diag
+        }
+        if !hasReceivedMainOutFromOSC,
+           let xmlMainOut = diag.mainChannelIndex,
+           controlRoom.mainOutChannelIndex != xmlMainOut
+        {
             controlRoom.mainOutChannelIndex = xmlMainOut
+        }
+    }
+
+    /// 开关 OSC 报文实时诊断日志采集；关闭时立即释放缓冲。
+    public func setDiagnosticsCaptureEnabled(_ enabled: Bool) {
+        isDiagnosticsCaptureEnabled = enabled
+        if !enabled && !recentDiagnostics.isEmpty {
+            recentDiagnostics.removeAll(keepingCapacity: false)
         }
     }
 
@@ -695,11 +726,13 @@ public final class TotalMixController {
         let address = message.address
         guard address.hasPrefix("/"), address != "/" else { return }
 
-        appendDiagnostic(
-            direction: "RX",
-            summary: "\(address) \(Self.formatArgsForLog(message.arguments))",
-            timestamp: rxTime
-        )
+        if isDiagnosticsCaptureEnabled {
+            appendDiagnostic(
+                direction: "RX",
+                summary: "\(address) \(Self.formatArgsForLog(message.arguments))",
+                timestamp: rxTime
+            )
+        }
 
         if processGlobalOSCMessage(message, timestamp: rxTime) {
             markValidResponseReceived(timestamp: rxTime)
@@ -716,16 +749,20 @@ public final class TotalMixController {
         if address.hasPrefix("/status/") {
             let key = String(address.dropFirst("/status/".count))
             if key == "device", let devName = firstArg?.stringValue, !devName.isEmpty {
-                detectedDeviceName = devName
+                if detectedDeviceName != devName {
+                    detectedDeviceName = devName
+                }
             } else if key == "dsp", let load = firstArg?.doubleValue {
-                dspLoad = load
+                if dspLoad != load {
+                    dspLoad = load
+                }
             }
             return true
         }
 
         // 2. 全局静音与监听室 /globalmute, /globalsolo, /controlroom/*
         if address == "/globalmute" {
-            if let flag = firstArg?.boolValue {
+            if let flag = firstArg?.boolValue, controlRoom.globalMute != flag {
                 controlRoom.globalMute = flag
             }
             return true
@@ -737,16 +774,18 @@ public final class TotalMixController {
             let sub = String(address.dropFirst("/controlroom/".count))
             switch sub {
             case "dim":
-                if let flag = firstArg?.boolValue { controlRoom.dim = flag }
+                if let flag = firstArg?.boolValue, controlRoom.dim != flag { controlRoom.dim = flag }
             case "mainmono":
-                if let flag = firstArg?.boolValue { controlRoom.mono = flag }
+                if let flag = firstArg?.boolValue, controlRoom.mono != flag { controlRoom.mono = flag }
             case "speakerb":
-                if let flag = firstArg?.boolValue { controlRoom.speakerB = flag }
+                if let flag = firstArg?.boolValue, controlRoom.speakerB != flag { controlRoom.speakerB = flag }
             case "talkback":
-                if let flag = firstArg?.boolValue { controlRoom.talkback = flag }
+                if let flag = firstArg?.boolValue, controlRoom.talkback != flag { controlRoom.talkback = flag }
             case "mainout":
                 if let ch = firstArg?.intValue, ch >= 0, ch < Self.maxChannelIndexLimit {
-                    controlRoom.mainOutChannelIndex = ch
+                    if controlRoom.mainOutChannelIndex != ch {
+                        controlRoom.mainOutChannelIndex = ch
+                    }
                     hasReceivedMainOutFromOSC = true
                 }
             default:
@@ -761,7 +800,9 @@ public final class TotalMixController {
             if let slot = Int(slotStr), (1...8).contains(slot), let val = firstArg?.doubleValue {
                 // Global OSC 中 val >= 2.0 代表当前激活快照
                 if val >= 1.5 {
-                    controlRoom.activeSnapshot = slot
+                    if controlRoom.activeSnapshot != slot {
+                        controlRoom.activeSnapshot = slot
+                    }
                 } else if controlRoom.activeSnapshot == slot {
                     controlRoom.activeSnapshot = nil
                 }
@@ -801,23 +842,29 @@ public final class TotalMixController {
                     if param == "fader", let db = firstArg?.doubleValue {
                         let norm = RMEFaderCurve.dbToNormalized(db)
                         let clampedDb = db <= RMEFaderCurve.minDb ? RMEFaderCurve.minDb : min(RMEFaderCurve.maxDb, db)
-                        submixRoutes[key] = SubmixRouteState(
+                        let newRoute = SubmixRouteState(
                             key: key,
                             normalizedFader: norm,
                             dbValue: clampedDb,
                             formattedDb: RMEFaderCurve.formatDb(db),
                             hasConfirmedValue: true
                         )
+                        if submixRoutes[key] != newRoute {
+                            submixRoutes[key] = newRoute
+                        }
                     } else if param == "faderlin", let rawNorm = firstArg?.doubleValue {
                         let norm = RMEFaderCurve.clampNormalized(rawNorm)
                         let db = RMEFaderCurve.normalizedToDb(norm)
-                        submixRoutes[key] = SubmixRouteState(
+                        let newRoute = SubmixRouteState(
                             key: key,
                             normalizedFader: norm,
                             dbValue: db,
                             formattedDb: RMEFaderCurve.formatDb(db),
                             hasConfirmedValue: true
                         )
+                        if submixRoutes[key] != newRoute {
+                            submixRoutes[key] = newRoute
+                        }
                     }
                     return true
                 }
@@ -1041,10 +1088,12 @@ public final class TotalMixController {
             }
         }
 
-        outputChannels[index].normalizedFader = normalized
-        outputChannels[index].dbValue = dbValue
-        outputChannels[index].formattedDb = formattedDb
-        outputChannels[index].hasConfirmedValue = true
+        mutateChannel(bus: .output, index: index) { ch in
+            ch.normalizedFader = normalized
+            ch.dbValue = dbValue
+            ch.formattedDb = formattedDb
+            ch.hasConfirmedValue = true
+        }
 
         // 冷启动防跳变落地：一旦拿到真实初始音量，立即将暂存增量平滑叠加发送！
         if let pending = pendingColdStartAdjustments.removeValue(forKey: index) {
@@ -1078,9 +1127,13 @@ public final class TotalMixController {
 
     private func markValidResponseReceived(timestamp: TimeInterval) {
         lastMessageTimestamp = timestamp
-        offlineDiagnostic = nil
+        if offlineDiagnostic != nil {
+            offlineDiagnostic = nil
+        }
         let wasConnected = isConnected
-        isConnected = true
+        if !wasConnected {
+            isConnected = true
+        }
 
         if !wasConnected || !hasInitialSyncCompleted {
             hasInitialSyncCompleted = true
@@ -1091,16 +1144,20 @@ public final class TotalMixController {
     private func handleTransportEvent(_ event: OSCInboundEvent) {
         switch event {
         case .transportStateChanged(let state):
-            transportState = state
+            if transportState != state {
+                transportState = state
+            }
             if case .portInUse = state {
-                isConnected = false
+                if isConnected { isConnected = false }
             } else if case .failed = state {
-                isConnected = false
+                if isConnected { isConnected = false }
             }
         case .messagesReceived(let messages, _, let timestamp):
             handleIncomingMessages(messages, timestamp: timestamp)
         case .diagnostic(let direction, let summary, let timestamp):
-            appendDiagnostic(direction: direction, summary: summary, timestamp: timestamp)
+            if isDiagnosticsCaptureEnabled || direction == "TX-ERR" {
+                appendDiagnostic(direction: direction, summary: summary, timestamp: timestamp)
+            }
         }
     }
 
@@ -1127,14 +1184,16 @@ public final class TotalMixController {
 
     private func sendOSC(_ message: OSCMessage) {
         if let customSendHandler {
-            appendDiagnostic(
-                direction: "TX",
-                summary: "\(message.address) \(Self.formatArgsForLog(message.arguments))",
-                timestamp: nowProvider()
-            )
+            if isDiagnosticsCaptureEnabled {
+                appendDiagnostic(
+                    direction: "TX",
+                    summary: "\(message.address) \(Self.formatArgsForLog(message.arguments))",
+                    timestamp: nowProvider()
+                )
+            }
             customSendHandler(message)
         } else {
-            transport?.send(message)
+            transport?.send(message, includeDiagnostic: isDiagnosticsCaptureEnabled)
         }
     }
 
@@ -1204,13 +1263,28 @@ public final class TotalMixController {
         switch bus {
         case .input:
             guard inputChannels.indices.contains(index) else { return }
-            body(&inputChannels[index])
+            let existing = inputChannels[index]
+            var updated = existing
+            body(&updated)
+            if updated != existing {
+                inputChannels[index] = updated
+            }
         case .playback:
             guard playbackChannels.indices.contains(index) else { return }
-            body(&playbackChannels[index])
+            let existing = playbackChannels[index]
+            var updated = existing
+            body(&updated)
+            if updated != existing {
+                playbackChannels[index] = updated
+            }
         case .output:
             guard outputChannels.indices.contains(index) else { return }
-            body(&outputChannels[index])
+            let existing = outputChannels[index]
+            var updated = existing
+            body(&updated)
+            if updated != existing {
+                outputChannels[index] = updated
+            }
         }
     }
 

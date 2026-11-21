@@ -80,6 +80,10 @@ public final class CoordinatorEngine {
     public private(set) var tourBoxState: TourBoxConnectionState = .disconnected
     public private(set) var serialDiagnostics: [SerialDiagnosticEntry] = []
 
+    /// 是否按需采集串口输入与 OSC 报文诊断日志（仅诊断面板打开时开启，平时仅保留少量系统级握手日志）。
+    @ObservationIgnored
+    public private(set) var isDiagnosticsCaptureEnabled: Bool = false
+
     /// 当前物理按下或正在旋转高亮（150ms 防抖）的控件区域集合（供 `TourBoxLiteCanvas` 实时发光）。
     public private(set) var activePhysicalControls: Set<TourBoxControlId> = []
 
@@ -149,6 +153,7 @@ public final class CoordinatorEngine {
     // MARK: - Private State
 
     private static let maxSerialDiagnostics = 120
+    private static let maxBackgroundSystemDiagnostics = 30
     private static let rotaryGlowDurationMs = 150
 
     private let configFileURL: URL?
@@ -260,6 +265,22 @@ public final class CoordinatorEngine {
         serialService?.reconnectNow()
     }
 
+    /// 开关串口输入与 OSC 报文实时诊断日志采集；关闭时清理高频 `"IN"` 输入记录，仅保留最近系统握手/异常日志。
+    public func setDiagnosticsCaptureEnabled(_ enabled: Bool) {
+        isDiagnosticsCaptureEnabled = enabled
+        totalMix.setDiagnosticsCaptureEnabled(enabled)
+        if !enabled {
+            let systemEntries = Array(
+                serialDiagnostics
+                    .filter { $0.direction != "IN" }
+                    .suffix(20)
+            )
+            if serialDiagnostics != systemEntries {
+                serialDiagnostics = systemEntries
+            }
+        }
+    }
+
     // MARK: - Channel Display Helper
 
     /// 获取指定总线与通道索引的实时可读名称。
@@ -289,24 +310,28 @@ public final class CoordinatorEngine {
 
     /// 处理单条串口事件（亦可供单元测试直接注入模拟事件）。
     public func handleSerialEvent(_ event: TourBoxSerialEvent) {
-        let now = ProcessInfo.processInfo.systemUptime
         switch event {
         case .stateChanged(let state):
-            tourBoxState = state
+            if tourBoxState != state {
+                tourBoxState = state
+            }
             if !state.isConnected {
                 releaseAllTransientControlStates()
             }
 
         case .rawDiagnostic(let direction, let hex, let note):
+            let now = ProcessInfo.processInfo.systemUptime
             appendSerialDiagnostic(direction: direction, hex: hex, note: note, timestamp: now)
 
         case .input(let decoded, let rawByte, let timestamp):
-            appendSerialDiagnostic(
-                direction: "IN",
-                hex: String(format: "%02X", rawByte),
-                note: decoded.diagnosticSummary,
-                timestamp: timestamp
-            )
+            if isDiagnosticsCaptureEnabled {
+                appendSerialDiagnostic(
+                    direction: "IN",
+                    hex: String(format: "%02X", rawByte),
+                    note: decoded.diagnosticSummary,
+                    timestamp: timestamp
+                )
+            }
             handleDecodedInput(decoded, timestamp: timestamp)
         }
     }
@@ -316,7 +341,9 @@ public final class CoordinatorEngine {
         updatePhysicalHighlight(for: decoded)
 
         let triggers = stateMachine.process(decoded, timestamp: timestamp)
-        activeHardwareModifiers = stateMachine.activeModifiers
+        if activeHardwareModifiers != stateMachine.activeModifiers {
+            activeHardwareModifiers = stateMachine.activeModifiers
+        }
         scheduleDoubleClickDeadlineIfNeeded(referenceNow: timestamp)
 
         for trigger in triggers {
@@ -926,7 +953,9 @@ public final class CoordinatorEngine {
             guard !Task.isCancelled, let self else { return }
             let now = ProcessInfo.processInfo.systemUptime
             let triggers = self.stateMachine.advanceTime(now: max(now, deadline + 0.001))
-            self.activeHardwareModifiers = self.stateMachine.activeModifiers
+            if self.activeHardwareModifiers != self.stateMachine.activeModifiers {
+                self.activeHardwareModifiers = self.stateMachine.activeModifiers
+            }
             for trigger in triggers {
                 self.executeResolvedTrigger(trigger)
             }
@@ -1003,7 +1032,9 @@ public final class CoordinatorEngine {
         ballisticsBySlot.removeAll()
 
         let releaseTriggers = stateMachine.reset()
-        activeHardwareModifiers = []
+        if !activeHardwareModifiers.isEmpty {
+            activeHardwareModifiers = []
+        }
         for trigger in releaseTriggers {
             if case .buttonUp(let btn, let mod) = trigger {
                 let action = resolveButtonAction(in: activeProfile, button: btn, modifier: mod)
@@ -1051,8 +1082,9 @@ public final class CoordinatorEngine {
                 timestamp: timestamp
             )
         )
-        if serialDiagnostics.count > Self.maxSerialDiagnostics {
-            serialDiagnostics.removeFirst(serialDiagnostics.count - Self.maxSerialDiagnostics)
+        let cap = isDiagnosticsCaptureEnabled ? Self.maxSerialDiagnostics : Self.maxBackgroundSystemDiagnostics
+        if serialDiagnostics.count > cap {
+            serialDiagnostics.removeFirst(serialDiagnostics.count - cap)
         }
     }
 }

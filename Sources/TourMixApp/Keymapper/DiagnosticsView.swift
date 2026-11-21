@@ -34,8 +34,13 @@ public struct DiagnosticsView: View {
             .padding(18)
         }
         .onAppear {
+            engine.setDiagnosticsCaptureEnabled(true)
             syncDraftsFromEngine()
             refreshSnapshotAndPermissions()
+            engine.totalMix.requestStateHeartbeat()
+        }
+        .onDisappear {
+            engine.setDiagnosticsCaptureEnabled(false)
         }
     }
 

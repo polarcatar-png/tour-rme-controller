@@ -265,4 +265,46 @@ struct TotalMixControllerTests {
         #expect(diagLegacy.issues.contains(.compatibilityNotGlobalOSC(slotNumber: 1, current: .legacy190)))
         #expect(diagLegacy.issues.contains(.remoteHostEmptyOrNonLocal(slotNumber: 1, currentHost: "")))
     }
+
+    @Test("按需诊断日志采集默认关闭、自适应在线心跳默认 10s 且重复相同状态幂等处理")
+    @MainActor
+    func onDemandDiagnosticsAndIdempotentUpdates() {
+        var sentMessages: [OSCMessage] = []
+        let clock = MockClock(600.0)
+        let controller = TotalMixController(
+            settleSyncDebounceSeconds: 10.0,
+            nowProvider: { clock.now },
+            sendHandler: { sentMessages.append($0) }
+        )
+
+        #expect(controller.isDiagnosticsCaptureEnabled == false)
+        #expect(controller.idleConnectedHeartbeatIntervalSeconds == 10.0)
+
+        // 关闭状态下收发报文不会膨胀 recentDiagnostics
+        controller.handleIncomingMessage(.string("/status/device", "Fireface UCX (23908219)"), timestamp: clock.now)
+        controller.handleIncomingMessage(.float("/output/0/volume", Float(-15.0)), timestamp: clock.now)
+        #expect(controller.recentDiagnostics.isEmpty)
+
+        // 重复推送完全相同的值应保持状态精确一致且不记录诊断日志
+        clock.now += 10.0
+        controller.handleIncomingMessage(.string("/status/device", "Fireface UCX (23908219)"), timestamp: clock.now)
+        controller.handleIncomingMessage(.float("/output/0/volume", Float(-15.0)), timestamp: clock.now)
+        #expect(controller.detectedDeviceName == "Fireface UCX (23908219)")
+        #expect(abs(controller.outputChannels[0].dbValue - (-15.0)) < 0.05)
+        #expect(controller.recentDiagnostics.isEmpty)
+
+        // 开启诊断采集后记录 TX/RX；再次关闭时立即清空释放内存
+        controller.setDiagnosticsCaptureEnabled(true)
+        #expect(controller.isDiagnosticsCaptureEnabled == true)
+        controller.requestStateHeartbeat()
+        controller.handleIncomingMessage(.string("/status/device", "Fireface UCX (23908219)"), timestamp: clock.now)
+        #expect(controller.recentDiagnostics.count == 2)
+        #expect(controller.recentDiagnostics.map(\.direction) == ["TX", "RX"])
+
+        controller.setDiagnosticsCaptureEnabled(false)
+        #expect(controller.isDiagnosticsCaptureEnabled == false)
+        #expect(controller.recentDiagnostics.isEmpty)
+
+        controller.stop()
+    }
 }

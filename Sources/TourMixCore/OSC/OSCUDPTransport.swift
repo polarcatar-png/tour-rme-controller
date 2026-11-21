@@ -148,9 +148,12 @@ public final class OSCUDPTransport: @unchecked Sendable {
     }
 
     /// 异步编码并发送单条 `OSCMessage`。
-    public nonisolated func send(_ message: OSCMessage) {
+    /// 默认关闭字符串格式化以减少高频/心跳场景的堆分配，仅在开启诊断监控时传入 `includeDiagnostic: true`。
+    public nonisolated func send(_ message: OSCMessage, includeDiagnostic: Bool = false) {
         let payload = OSCCodec.encode(message)
-        let summary = "\(message.address) \(Self.describeArguments(message.arguments))"
+        let summary = includeDiagnostic
+            ? "\(message.address) \(Self.describeArguments(message.arguments))"
+            : nil
         sendRawData(payload, diagnosticSummary: summary)
     }
 

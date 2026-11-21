@@ -51,8 +51,15 @@ public final class KeymapperWindowController: NSObject, NSWindowDelegate {
             name: ShortcutRecorderView.cancelRecordingNotification,
             object: nil
         )
+        engine.setDiagnosticsCaptureEnabled(false)
 
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if let closing = self.window, !closing.isVisible {
+                closing.delegate = nil
+                closing.contentViewController = nil
+                self.window = nil
+            }
             NSApp.setActivationPolicy(.accessory)
         }
     }

@@ -13,14 +13,19 @@ public final class HUDPanelController {
     public static let bottomOffset: CGFloat = 72
 
     private let viewModel = HUDViewModel()
-    private let panel: NSPanel
+    private var panel: NSPanel?
     private var fadeGeneration: UInt64 = 0
     private var fadeTask: Task<Void, Never>?
 
     /// Hold duration in milliseconds before starting alpha fade-out. Default: `1200` ms.
     public var holdDurationMs: Int = 1200
 
-    public init() {
+    public init() {}
+
+    private func ensurePanel() -> NSPanel {
+        if let existing = panel {
+            return existing
+        }
         let contentRect = NSRect(origin: .zero, size: Self.panelSize)
         let hudPanel = NSPanel(
             contentRect: contentRect,
@@ -50,10 +55,13 @@ public final class HUDPanelController {
         hudPanel.contentView = hostingView
 
         self.panel = hudPanel
+        return hudPanel
     }
 
     /// Displays or updates the HUD immediately on the active cursor screen and resets the `1.2 s` auto-hide timer.
     public func show(_ payload: HUDPayload) {
+        let activePanel = ensurePanel()
+
         fadeGeneration &+= 1
         let generation = fadeGeneration
         fadeTask?.cancel()
@@ -64,33 +72,33 @@ public final class HUDPanelController {
             viewModel.payload = payload
         }
 
-        positionPanelIfNeeded()
+        positionPanelIfNeeded(activePanel)
 
         // Immediately cancel any in-flight AppKit alpha animation and restore full opacity
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0
-            panel.animator().alphaValue = 1.0
+            activePanel.animator().alphaValue = 1.0
         }
-        panel.alphaValue = 1.0
+        activePanel.alphaValue = 1.0
 
-        if !panel.isVisible {
-            panel.orderFrontRegardless()
+        if !activePanel.isVisible {
+            activePanel.orderFrontRegardless()
         }
 
         let holdMs = max(150, holdDurationMs)
         fadeTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(holdMs))
-            guard !Task.isCancelled, let self, self.fadeGeneration == generation else { return }
+            guard !Task.isCancelled, let self, self.fadeGeneration == generation, let panel = self.panel else { return }
 
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.18
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                self.panel.animator().alphaValue = 0.0
+                panel.animator().alphaValue = 0.0
             }, completionHandler: nil)
 
             try? await Task.sleep(for: .milliseconds(190))
-            guard !Task.isCancelled, self.fadeGeneration == generation else { return }
-            self.panel.orderOut(nil)
+            guard !Task.isCancelled, self.fadeGeneration == generation, let panel = self.panel else { return }
+            panel.orderOut(nil)
         }
     }
 
@@ -99,13 +107,14 @@ public final class HUDPanelController {
         fadeGeneration &+= 1
         fadeTask?.cancel()
         fadeTask = nil
+        guard let panel else { return }
         panel.alphaValue = 0.0
         panel.orderOut(nil)
     }
 
     // MARK: - Multi-Monitor Positioning
 
-    private func positionPanelIfNeeded() {
+    private func positionPanelIfNeeded(_ activePanel: NSPanel) {
         let mouseLocation = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
             ?? NSScreen.main
@@ -120,12 +129,12 @@ public final class HUDPanelController {
         )
 
         // Avoid redundant WindowServer frame IPC during 30~80 Hz rotary bursts on the same monitor
-        let currentOrigin = panel.frame.origin
-        if !panel.isVisible
+        let currentOrigin = activePanel.frame.origin
+        if !activePanel.isVisible
             || abs(currentOrigin.x - targetOrigin.x) > 0.5
             || abs(currentOrigin.y - targetOrigin.y) > 0.5
         {
-            panel.setFrameOrigin(targetOrigin)
+            activePanel.setFrameOrigin(targetOrigin)
         }
     }
 }
