@@ -87,6 +87,7 @@ public final class KeymapperWindowController: NSObject, NSWindowDelegate {
         created.contentViewController = hostingController
         created.title = "TourMix 控制台"
         created.titlebarAppearsTransparent = false
+        created.backgroundColor = TotalMixTheme.windowBackgroundNSColor
         created.isReleasedWhenClosed = false
         created.minSize = NSSize(width: 860, height: 560)
         created.appearance = NSAppearance(named: .darkAqua)

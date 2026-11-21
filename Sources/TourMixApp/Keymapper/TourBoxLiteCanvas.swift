@@ -96,21 +96,21 @@ public struct TourBoxLiteCanvas: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.16, green: 0.17, blue: 0.20),
-                            Color(red: 0.10, green: 0.11, blue: 0.14)
+                            Color(red: 0.169, green: 0.188, blue: 0.212),
+                            Color(red: 0.118, green: 0.133, blue: 0.149)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: Color.black.opacity(0.45), radius: 16 * scale, x: 0, y: 10 * scale)
+                .shadow(color: Color.black.opacity(0.48), radius: 16 * scale, x: 0, y: 10 * scale)
 
             outerPath
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.20),
-                            Color.white.opacity(0.05)
+                            TotalMixTheme.borderBevel.opacity(0.85),
+                            TotalMixTheme.borderSubtle.opacity(0.35)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -123,8 +123,8 @@ public struct TourBoxLiteCanvas: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.12, green: 0.13, blue: 0.16),
-                            Color(red: 0.09, green: 0.10, blue: 0.12)
+                            TotalMixTheme.windowBackground,
+                            TotalMixTheme.chassisDeep
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -132,15 +132,15 @@ public struct TourBoxLiteCanvas: View {
                 )
 
             innerPath
-                .stroke(Color.white.opacity(0.08), lineWidth: max(0.7, 0.9 * scale))
+                .stroke(TotalMixTheme.borderSubtle.opacity(0.65), lineWidth: max(0.7, 0.9 * scale))
 
             // Central knob recess dish
             recessPath
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color.black.opacity(0.46),
-                            Color(red: 0.11, green: 0.12, blue: 0.15).opacity(0.85)
+                            TotalMixTheme.chassisDeep,
+                            TotalMixTheme.windowBackgroundBottom.opacity(0.92)
                         ],
                         center: .center,
                         startRadius: 10 * scale,
@@ -151,8 +151,8 @@ public struct TourBoxLiteCanvas: View {
             recessPath
                 .stroke(
                     knobActive
-                        ? Color(red: 1.0, green: 0.72, blue: 0.24).opacity(0.55)
-                        : Color.white.opacity(0.09),
+                        ? TotalMixTheme.rmeAmber.opacity(0.78)
+                        : TotalMixTheme.borderSubtle.opacity(0.75),
                     lineWidth: max(0.8, 1.1 * scale)
                 )
 
@@ -161,8 +161,8 @@ public struct TourBoxLiteCanvas: View {
                 dot.path(transform: transform)
                     .fill(
                         knobActive
-                            ? Color(red: 1.0, green: 0.76, blue: 0.30).opacity(0.90)
-                            : Color.white.opacity(0.24)
+                            ? TotalMixTheme.rmeAmber.opacity(0.95)
+                            : TotalMixTheme.textMuted.opacity(0.55)
                     )
             }
         }
@@ -237,7 +237,7 @@ public struct TourBoxLiteCanvas: View {
         return ZStack {
             if isPhysicallyActive {
                 scaledPath
-                    .fill(Color(red: 1.0, green: 0.68, blue: 0.18).opacity(0.32))
+                    .fill(TotalMixTheme.rmeAmber.opacity(0.36))
                     .blur(radius: 6 * scale)
             }
 
@@ -311,26 +311,26 @@ public struct TourBoxLiteCanvas: View {
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(
                                 isSelected || isPhysicallyActive
-                                    ? Color(red: 0.36, green: 0.86, blue: 0.98)
-                                    : Color.white.opacity(0.62)
+                                    ? TotalMixTheme.accent
+                                    : TotalMixTheme.textSecondary
                             )
 
                         if isModifier {
                             Text("MOD")
                                 .font(.system(size: 8.5, weight: .heavy, design: .rounded))
-                                .foregroundStyle(Color(red: 0.22, green: 0.92, blue: 0.88))
+                                .foregroundStyle(TotalMixTheme.accentGold)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 0.5)
                                 .background(
                                     Capsule(style: .continuous)
-                                        .fill(Color(red: 0.16, green: 0.80, blue: 0.80).opacity(0.22))
+                                        .fill(TotalMixTheme.accentGold.opacity(0.20))
                                 )
                         }
 
                         if let primary {
                             Text(primary)
                                 .font(.system(size: 10.5, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.96))
+                                .foregroundStyle(TotalMixTheme.textPrimary)
                                 .lineLimit(1)
                         }
                     }
@@ -338,7 +338,7 @@ public struct TourBoxLiteCanvas: View {
                     if let secondary {
                         Text(secondary)
                             .font(.system(size: 9.5, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.68))
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -346,28 +346,28 @@ public struct TourBoxLiteCanvas: View {
                 .padding(.vertical, 3.5)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(Color(red: 0.09, green: 0.11, blue: 0.15).opacity(0.92))
+                        .fill(TotalMixTheme.chassisDeep.opacity(0.94))
                 )
                 .overlay(
                     Capsule(style: .continuous)
                         .strokeBorder(
                             isPhysicallyActive
-                                ? Color(red: 1.0, green: 0.74, blue: 0.26).opacity(0.85)
+                                ? TotalMixTheme.rmeAmber.opacity(0.92)
                                 : (isSelected
-                                    ? Color(red: 0.32, green: 0.82, blue: 0.98).opacity(0.85)
-                                    : Color.white.opacity(0.22)),
+                                    ? TotalMixTheme.accent.opacity(0.90)
+                                    : TotalMixTheme.borderBevel),
                             lineWidth: isSelected ? 1.2 : 0.8
                         )
                 )
-                .shadow(color: Color.black.opacity(0.35), radius: 4, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(0.40), radius: 4, x: 0, y: 2)
             } else {
                 // Unbound control: restrained, low-noise label so bound controls stand out clearly
                 Text(controlId.shortTitle)
                     .font(.system(size: 10.5, weight: isSelected ? .bold : .medium, design: .rounded))
                     .foregroundStyle(
                         isPhysicallyActive
-                            ? Color(red: 1.0, green: 0.78, blue: 0.30)
-                            : (isSelected ? Color.white.opacity(0.95) : Color.white.opacity(0.38))
+                            ? TotalMixTheme.rmeAmber
+                            : (isSelected ? TotalMixTheme.textPrimary : TotalMixTheme.textMuted)
                     )
                     .padding(.horizontal, isSelected ? 7 : 4)
                     .padding(.vertical, 2)
@@ -375,7 +375,7 @@ public struct TourBoxLiteCanvas: View {
                         Group {
                             if isSelected {
                                 Capsule(style: .continuous)
-                                    .fill(Color(red: 0.22, green: 0.64, blue: 0.92).opacity(0.24))
+                                    .fill(TotalMixTheme.accentDeep.opacity(0.32))
                             }
                         }
                     )
@@ -383,7 +383,7 @@ public struct TourBoxLiteCanvas: View {
                         Group {
                             if isSelected {
                                 Capsule(style: .continuous)
-                                    .strokeBorder(Color(red: 0.34, green: 0.82, blue: 0.98).opacity(0.70), lineWidth: 1.0)
+                                    .strokeBorder(TotalMixTheme.accent.opacity(0.80), lineWidth: 1.0)
                             }
                         }
                     )
@@ -418,8 +418,8 @@ public struct TourBoxLiteCanvas: View {
         if isPhysicallyActive {
             return LinearGradient(
                 colors: [
-                    Color(red: 0.98, green: 0.66, blue: 0.20).opacity(0.50),
-                    Color(red: 0.85, green: 0.44, blue: 0.12).opacity(0.36)
+                    TotalMixTheme.rmeAmber.opacity(0.55),
+                    TotalMixTheme.rmeAmberDeep.opacity(0.40)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -428,8 +428,8 @@ public struct TourBoxLiteCanvas: View {
         if isSelected {
             return LinearGradient(
                 colors: [
-                    Color(red: 0.22, green: 0.66, blue: 0.94).opacity(0.42),
-                    Color(red: 0.14, green: 0.44, blue: 0.78).opacity(0.28)
+                    TotalMixTheme.accent.opacity(0.36),
+                    TotalMixTheme.accentDeep.opacity(0.32)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -438,8 +438,8 @@ public struct TourBoxLiteCanvas: View {
         if isHovered {
             return LinearGradient(
                 colors: [
-                    Color.white.opacity(hasBinding ? 0.20 : 0.13),
-                    Color.white.opacity(hasBinding ? 0.11 : 0.06)
+                    TotalMixTheme.surfaceControlHover,
+                    TotalMixTheme.surfaceControl
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -448,8 +448,8 @@ public struct TourBoxLiteCanvas: View {
         if hasBinding {
             return LinearGradient(
                 colors: [
-                    Color(red: 0.22, green: 0.26, blue: 0.33),
-                    Color(red: 0.16, green: 0.19, blue: 0.25)
+                    Color(red: 0.216, green: 0.255, blue: 0.290),
+                    TotalMixTheme.stripSurfaceBottom
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -457,8 +457,8 @@ public struct TourBoxLiteCanvas: View {
         }
         return LinearGradient(
             colors: [
-                Color(red: 0.16, green: 0.17, blue: 0.20),
-                Color(red: 0.13, green: 0.14, blue: 0.17)
+                TotalMixTheme.stripSurfaceTop.opacity(0.75),
+                TotalMixTheme.toolbarBackground
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -473,20 +473,20 @@ public struct TourBoxLiteCanvas: View {
         hasBinding: Bool
     ) -> Color {
         if isPhysicallyActive {
-            return Color(red: 1.0, green: 0.78, blue: 0.32)
+            return TotalMixTheme.rmeAmber
         }
         if isSelected {
-            return Color(red: 0.38, green: 0.86, blue: 1.0)
+            return TotalMixTheme.accent
         }
         if isModifier {
-            return Color(red: 0.24, green: 0.88, blue: 0.84).opacity(isHovered ? 0.95 : 0.72)
+            return TotalMixTheme.accentGold.opacity(isHovered ? 0.95 : 0.72)
         }
         if isHovered {
-            return Color.white.opacity(0.55)
+            return TotalMixTheme.borderBevel
         }
         if hasBinding {
-            return Color(red: 0.36, green: 0.74, blue: 0.94).opacity(0.52)
+            return TotalMixTheme.accent.opacity(0.56)
         }
-        return Color.white.opacity(0.18)
+        return TotalMixTheme.borderSubtle
     }
 }

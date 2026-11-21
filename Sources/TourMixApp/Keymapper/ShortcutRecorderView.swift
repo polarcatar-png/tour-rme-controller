@@ -115,13 +115,13 @@ public struct ShortcutRecorderView: View {
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundStyle(
                             isRecording
-                                ? Color(red: 1.0, green: 0.45, blue: 0.36)
-                                : (resolvedLabel != nil ? Color.accentColor : Color.secondary)
+                                ? TotalMixTheme.rmeRed
+                                : (resolvedLabel != nil ? TotalMixTheme.accent : TotalMixTheme.textSecondary)
                         )
 
                     Text(buttonTitle(resolvedLabel: resolvedLabel))
                         .font(.system(size: 12, weight: resolvedLabel != nil || isRecording ? .semibold : .regular, design: .rounded))
-                        .foregroundStyle(resolvedLabel != nil || isRecording ? Color.primary : Color.secondary)
+                        .foregroundStyle(resolvedLabel != nil || isRecording ? TotalMixTheme.textPrimary : TotalMixTheme.textSecondary)
                         .lineLimit(1)
 
                     Spacer(minLength: 4)
@@ -129,7 +129,7 @@ public struct ShortcutRecorderView: View {
                     if isRecording {
                         Text("点此取消")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color.secondary)
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                     }
                 }
                 .padding(.horizontal, 10)
@@ -139,16 +139,16 @@ public struct ShortcutRecorderView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(
                             isRecording
-                                ? Color.accentColor.opacity(0.14)
-                                : Color(nsColor: .controlBackgroundColor)
+                                ? TotalMixTheme.accentDeep.opacity(0.24)
+                                : TotalMixTheme.chassisDeep
                         )
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(
                             isRecording
-                                ? Color.accentColor
-                                : Color.primary.opacity(0.16),
+                                ? TotalMixTheme.accent
+                                : TotalMixTheme.borderSubtle,
                             lineWidth: isRecording ? 1.4 : 0.9
                         )
                 )
@@ -224,15 +224,15 @@ public struct ShortcutRecorderView: View {
         } label: {
             Image(systemName: "keyboard.chevron.compact.down")
                 .font(.system(size: 12))
-                .foregroundStyle(Color.secondary)
+                .foregroundStyle(TotalMixTheme.textSecondary)
                 .frame(width: 24, height: 24)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(TotalMixTheme.surfaceControl)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.14), lineWidth: 0.8)
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.8)
                 )
         }
         .menuStyle(.borderlessButton)

@@ -33,6 +33,7 @@ public struct DiagnosticsView: View {
             }
             .padding(18)
         }
+        .background(TotalMixTheme.windowBackground)
         .onAppear {
             engine.setDiagnosticsCaptureEnabled(true)
             syncDraftsFromEngine()
@@ -71,69 +72,83 @@ public struct DiagnosticsView: View {
 
                     Text(engine.tourBoxState.displayText)
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(TotalMixTheme.textSecondary)
 
                     if let port = engine.tourBoxState.port {
                         Text("设备节点：\(port)")
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                     } else {
                         Text("匹配 VID:PID = 0xCAFE:0x4001 (115200 8N1)")
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                     }
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(TotalMixTheme.chassisDeep.opacity(0.65))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
+                        )
+                )
 
                 // 右卡：TotalMix FX Global OSC 状态
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Circle()
-                            .fill(engine.totalMix.isConnected ? Color.green : Color.orange)
+                            .fill(engine.totalMix.isConnected ? TotalMixTheme.rmeGreen : TotalMixTheme.rmeAmber)
                             .frame(width: 9, height: 9)
                         Text("TotalMix FX Global OSC")
                             .font(.system(size: 13, weight: .semibold))
                         Spacer()
                         Text(engine.totalMix.isConnected ? "实时在线" : "等待响应")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(engine.totalMix.isConnected ? .green : .orange)
+                            .foregroundStyle(engine.totalMix.isConnected ? TotalMixTheme.rmeGreen : TotalMixTheme.rmeAmber)
                     }
 
                     Text("设备型号：\(engine.totalMix.detectedDeviceName)")
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(TotalMixTheme.textSecondary)
 
                     HStack(spacing: 12) {
                         Text("Control Room Main Out：\(engine.totalMix.mainOutDisplayName)")
                             .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                         if let dsp = engine.totalMix.dspLoad {
                             Text(String(format: "DSP: %.1f%%", dsp))
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(TotalMixTheme.textSecondary)
                         }
                     }
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(TotalMixTheme.chassisDeep.opacity(0.65))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
+                        )
+                )
             }
 
             // 若本地 UDP 接收端口冲突（如 9001 被 TouchOSC / Companion 占用），醒目红字警告并提供一键切换
             if case .portInUse(let busyPort, let message) = engine.totalMix.transportState {
                 HStack(spacing: 10) {
                     Image(systemName: "exclamationmark.octagon.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(TotalMixTheme.rmeRed)
                         .font(.system(size: 16))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("UDP 监听端口 \(busyPort) 被占用")
                             .font(.system(size: 12.5, weight: .bold))
-                            .foregroundStyle(.red)
+                            .foregroundStyle(TotalMixTheme.rmeRed)
                         Text(message)
                             .font(.system(size: 11.5))
-                            .foregroundStyle(.primary.opacity(0.9))
+                            .foregroundStyle(TotalMixTheme.textPrimary)
                     }
                     Spacer()
                     Button("一键改用 7002 / 9002") {
@@ -143,11 +158,18 @@ public struct DiagnosticsView: View {
                         applyOSCPortChanges()
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.orange)
+                    .tint(TotalMixTheme.rmeAmber)
                     .controlSize(.small)
                 }
                 .padding(10)
-                .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(TotalMixTheme.rmeRed.opacity(0.14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .strokeBorder(TotalMixTheme.rmeRed.opacity(0.45), lineWidth: 0.9)
+                        )
+                )
             }
 
             // OSC 端点编辑表单
@@ -217,7 +239,7 @@ public struct DiagnosticsView: View {
                     HStack {
                         Text("TotalMix 磁盘 XML 快照辅助自检（注：TotalMix 默认退出时才写盘，实时状态以 UDP 为准）")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                         Spacer()
                         Button("重新读取 XML") {
                             refreshSnapshotAndPermissions()
@@ -229,20 +251,34 @@ public struct DiagnosticsView: View {
                     if let fileURL = snapshot.xmlFileURL {
                         Text("快照文件：\(fileURL.lastPathComponent) · Enable OSC=\(snapshot.oscMasterEnabled ? "ON" : "OFF") · 模式=\(snapshot.matchedRemote?.compatibility.displayName ?? "N/A") · 快照 MainOut=\(snapshot.mainChannelDisplayName ?? "N/A")")
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                     }
                     if !engine.totalMix.isConnected {
                         Text(snapshot.offlineHintSummary)
                             .font(.system(size: 11))
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(TotalMixTheme.rmeAmber)
                     }
                 }
                 .padding(10)
-                .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 8))
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(TotalMixTheme.chassisDeep.opacity(0.65))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.75)
+                        )
+                )
             }
         }
         .padding(14)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(TotalMixTheme.stripCardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
+                )
+        )
     }
 
     // MARK: - 2. App Installation & Accessibility Permissions
@@ -274,7 +310,7 @@ public struct DiagnosticsView: View {
 
                     Text("当前路径：\(launchManager.currentBundlePath)")
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                         .textSelection(.enabled)
 
                     HStack(spacing: 8) {
@@ -283,7 +319,7 @@ public struct DiagnosticsView: View {
                             systemImage: launchManager.isRunningFromApplications ? "checkmark.circle.fill" : "info.circle"
                         )
                         .font(.system(size: 11.5))
-                        .foregroundStyle(launchManager.isRunningFromApplications ? .green : .orange)
+                        .foregroundStyle(launchManager.isRunningFromApplications ? TotalMixTheme.rmeGreen : TotalMixTheme.rmeAmber)
 
                         Spacer()
 
@@ -298,12 +334,19 @@ public struct DiagnosticsView: View {
                     if let err = launchManager.lastError {
                         Text(err)
                             .font(.system(size: 11))
-                            .foregroundStyle(.red)
+                            .foregroundStyle(TotalMixTheme.rmeRed)
                     }
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(TotalMixTheme.chassisDeep.opacity(0.65))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
+                        )
+                )
 
                 // 右卡：辅助功能权限（仅键盘快捷键合成需要）
                 VStack(alignment: .leading, spacing: 8) {
@@ -313,12 +356,12 @@ public struct DiagnosticsView: View {
                         Spacer()
                         Text(isAccessibilityTrusted ? "已授权" : "未授权（纯 RME 控制无需此权限）")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(isAccessibilityTrusted ? .green : .secondary)
+                            .foregroundStyle(isAccessibilityTrusted ? TotalMixTheme.rmeGreen : TotalMixTheme.textSecondary)
                     }
 
                     Text("控制 RME 音量/静音/监听室及系统媒体键完全无需任何隐私权限；仅当您为按键绑定「自定义电脑键盘快捷键」时才需开启。")
                         .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(TotalMixTheme.textSecondary)
 
                     HStack(spacing: 8) {
                         Button("请求授权 / 打开设置") {
@@ -345,11 +388,25 @@ public struct DiagnosticsView: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(TotalMixTheme.chassisDeep.opacity(0.65))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
+                        )
+                )
             }
         }
         .padding(14)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(TotalMixTheme.stripCardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
+                )
+        )
     }
 
     // MARK: - 3 & 4. Live Serial Byte Stream & OSC Packet Monitors
@@ -363,7 +420,7 @@ public struct DiagnosticsView: View {
                     Spacer()
                     Text("\(engine.serialDiagnostics.count) 条")
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                 }
 
                 ScrollView(.vertical) {
@@ -372,21 +429,21 @@ public struct DiagnosticsView: View {
                         if items.isEmpty {
                             Text("暂无串口报文（转动旋钮或按下任意键即可实时观测原始 Hex 字节）")
                                 .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(TotalMixTheme.textSecondary)
                                 .padding(8)
                         } else {
                             ForEach(items) { entry in
                                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                                     Text(entry.direction)
                                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                        .foregroundStyle(entry.direction == "IN" ? .cyan : .orange)
+                                        .foregroundStyle(entry.direction == "IN" ? TotalMixTheme.rmeGreenBright : TotalMixTheme.rmeAmber)
                                         .frame(width: 34, alignment: .leading)
                                     Text(entry.hex)
                                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(TotalMixTheme.textPrimary)
                                     Text(entry.note)
                                         .font(.system(size: 11))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(TotalMixTheme.textSecondary)
                                         .lineLimit(1)
                                 }
                                 .textSelection(.enabled)
@@ -396,11 +453,25 @@ public struct DiagnosticsView: View {
                     .padding(8)
                 }
                 .frame(height: 220)
-                .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 8))
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(TotalMixTheme.chassisDeep)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.75)
+                        )
+                )
             }
             .padding(14)
             .frame(maxWidth: .infinity)
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(TotalMixTheme.stripCardGradient)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
+                    )
+            )
 
             // 实时 OSC 报文监视器
             VStack(alignment: .leading, spacing: 8) {
@@ -423,7 +494,7 @@ public struct DiagnosticsView: View {
                         if items.isEmpty {
                             Text("暂无 OSC 报文")
                                 .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(TotalMixTheme.textSecondary)
                                 .padding(8)
                         } else {
                             ForEach(items) { item in
@@ -434,7 +505,7 @@ public struct DiagnosticsView: View {
                                         .frame(width: 48, alignment: .leading)
                                     Text(item.summary)
                                         .font(.system(size: 11, design: .monospaced))
-                                        .foregroundStyle(.primary.opacity(0.92))
+                                        .foregroundStyle(TotalMixTheme.textPrimary)
                                         .lineLimit(1)
                                 }
                                 .textSelection(.enabled)
@@ -444,11 +515,25 @@ public struct DiagnosticsView: View {
                     .padding(8)
                 }
                 .frame(height: 220)
-                .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 8))
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(TotalMixTheme.chassisDeep)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.75)
+                        )
+                )
             }
             .padding(14)
             .frame(maxWidth: .infinity)
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(TotalMixTheme.stripCardGradient)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
+                    )
+            )
         }
     }
 
@@ -458,9 +543,10 @@ public struct DiagnosticsView: View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.cyan)
+                .foregroundStyle(TotalMixTheme.accent)
             Text(title)
                 .font(.system(size: 13.5, weight: .bold))
+                .foregroundStyle(TotalMixTheme.textPrimary)
         }
     }
 
@@ -498,16 +584,16 @@ public struct DiagnosticsView: View {
 
     private var tourBoxColor: Color {
         switch engine.tourBoxState {
-        case .connected: return .green
-        case .connecting, .portBusy: return .orange
-        case .disconnected: return .gray
-        case .error: return .red
+        case .connected: return TotalMixTheme.rmeGreen
+        case .connecting, .portBusy: return TotalMixTheme.rmeAmber
+        case .disconnected: return TotalMixTheme.textMuted
+        case .error: return TotalMixTheme.rmeRed
         }
     }
 
     private func oscDirectionColor(_ dir: String) -> Color {
-        if dir == "RX" { return .green }
-        if dir == "TX" { return .cyan }
-        return .orange
+        if dir == "RX" { return TotalMixTheme.rmeGreen }
+        if dir == "TX" { return TotalMixTheme.accent }
+        return TotalMixTheme.rmeAmber
     }
 }

@@ -244,8 +244,10 @@ public struct FaderStepResult: Equatable, Sendable {
     public let dbValue: Double
     /// 变更后的格式化分贝文本。
     public let formattedDb: String
-    /// 本次顺时针步进是否触发了 `0.0 dB` 安全限位锁。
+    /// 本次顺时针步进是否触发了音量安全限位锁。
     public let hitZeroDbLock: Bool
+    /// 若本次操作受安全上限保护，记录当前设定的安全上限（dB）。
+    public let safetyMaxDb: Double?
     /// 若通道尚未收到 TotalMix 初始音量确认（`hasConfirmedValue == false`），
     /// 本次增量已暂存并触发 `/sendchan/output/{ch}`，此时为 `true`（未盲目发送绝对值）。
     public let isDeferredColdStart: Bool
@@ -259,6 +261,7 @@ public struct FaderStepResult: Equatable, Sendable {
         dbValue: Double,
         formattedDb: String,
         hitZeroDbLock: Bool = false,
+        safetyMaxDb: Double? = nil,
         isDeferredColdStart: Bool = false,
         isMuted: Bool = false
     ) {
@@ -268,6 +271,7 @@ public struct FaderStepResult: Equatable, Sendable {
         self.dbValue = dbValue
         self.formattedDb = formattedDb
         self.hitZeroDbLock = hitZeroDbLock
+        self.safetyMaxDb = safetyMaxDb
         self.isDeferredColdStart = isDeferredColdStart
         self.isMuted = isMuted
     }

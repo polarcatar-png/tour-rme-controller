@@ -9,6 +9,7 @@ public struct HUDPayload: Equatable, Sendable {
     public var dbText: String
     public var normalizedLevel: Double
     public var unityNormalizedPosition: Double
+    public var safetyLimitNormalizedPosition: Double?
     public var isMuted: Bool
     public var hitZeroDbLock: Bool
     public var badgeText: String?
@@ -20,6 +21,7 @@ public struct HUDPayload: Equatable, Sendable {
         dbText: String,
         normalizedLevel: Double,
         unityNormalizedPosition: Double = 836.0 / 1023.0,
+        safetyLimitNormalizedPosition: Double? = nil,
         isMuted: Bool = false,
         hitZeroDbLock: Bool = false,
         badgeText: String? = nil,
@@ -30,6 +32,7 @@ public struct HUDPayload: Equatable, Sendable {
         self.dbText = dbText
         self.normalizedLevel = min(1.0, max(0.0, normalizedLevel))
         self.unityNormalizedPosition = min(1.0, max(0.0, unityNormalizedPosition))
+        self.safetyLimitNormalizedPosition = safetyLimitNormalizedPosition.map { min(1.0, max(0.0, $0)) }
         self.isMuted = isMuted
         self.hitZeroDbLock = hitZeroDbLock
         self.badgeText = badgeText
@@ -71,8 +74,8 @@ private struct HUDVibrancyBackground: NSViewRepresentable {
     }
 }
 
-/// Frosted glass capsule HUD view (`300 x 84`) with animation-free high-frequency meter bar,
-/// `0 dB` unity tick line, monospaced dB readout, and `🔒 0 dB MAX` safety clamp badge.
+/// Frosted glass capsule HUD view (`336 x 84`) with animation-free high-frequency meter bar,
+/// `0 dB` unity tick line, custom safety ceiling zone/tick, monospaced dB readout, and dynamic MAX lock badge.
 public struct HUDContentView: View {
     private enum Source {
         case observed(HUDViewModel)
@@ -107,8 +110,8 @@ public struct HUDContentView: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.07),
-                    Color.black.opacity(0.22)
+                    TotalMixTheme.stripSurfaceTop.opacity(0.62),
+                    TotalMixTheme.chassisDeep.opacity(0.76)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -124,13 +127,13 @@ public struct HUDContentView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(payload.title)
                             .font(.system(size: 13.5, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.96))
+                            .foregroundStyle(TotalMixTheme.textPrimary)
                             .lineLimit(1)
 
                         if let subtitle = payload.subtitle, !subtitle.isEmpty {
                             Text(subtitle)
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.50))
+                                .foregroundStyle(TotalMixTheme.textSecondary)
                                 .lineLimit(1)
                         }
                     }
@@ -138,9 +141,9 @@ public struct HUDContentView: View {
                     Spacer(minLength: 4)
 
                     if payload.hitZeroDbLock {
-                        zeroDbLockBadge
+                        lockBadge(text: payload.badgeText ?? "0 dB MAX")
                     } else if let badge = payload.badgeText, !badge.isEmpty {
-                        customBadge(badge)
+                        customBadge(badge, isMuted: payload.isMuted)
                     }
 
                     Text(payload.isMuted ? "MUTED" : payload.dbText)
@@ -156,16 +159,11 @@ public struct HUDContentView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
         }
-        .frame(width: 300, height: 84)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(width: 336, height: 84)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(
-                    payload.hitZeroDbLock
-                        ? Color(red: 1.0, green: 0.72, blue: 0.22).opacity(0.55)
-                        : Color.white.opacity(0.16),
-                    lineWidth: 0.9
-                )
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(borderColor(for: payload), lineWidth: 1.0)
         )
         .environment(\.colorScheme, .dark)
         .transaction { transaction in
@@ -174,36 +172,57 @@ public struct HUDContentView: View {
         }
     }
 
-    private var zeroDbLockBadge: some View {
+    private func borderColor(for payload: HUDPayload) -> Color {
+        if payload.hitZeroDbLock {
+            return TotalMixTheme.rmeAmber.opacity(0.85)
+        }
+        if payload.isMuted {
+            return TotalMixTheme.rmeRed.opacity(0.75)
+        }
+        return TotalMixTheme.borderBevel.opacity(0.78)
+    }
+
+    private func lockBadge(text: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 8.5, weight: .bold))
-            Text("0 dB MAX")
+            Text(text)
                 .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                .lineLimit(1)
         }
-        .foregroundStyle(Color(red: 1.0, green: 0.80, blue: 0.32))
+        .foregroundStyle(TotalMixTheme.rmeAmber)
         .padding(.horizontal, 6.5)
         .padding(.vertical, 2.5)
         .background(
             Capsule(style: .continuous)
-                .fill(Color(red: 1.0, green: 0.65, blue: 0.12).opacity(0.20))
+                .fill(TotalMixTheme.rmeAmber.opacity(0.20))
         )
         .overlay(
             Capsule(style: .continuous)
-                .strokeBorder(Color(red: 1.0, green: 0.75, blue: 0.25).opacity(0.45), lineWidth: 0.75)
+                .strokeBorder(TotalMixTheme.rmeAmber.opacity(0.55), lineWidth: 0.75)
         )
+        .fixedSize(horizontal: true, vertical: false)
     }
 
-    private func customBadge(_ text: String) -> some View {
+    private func customBadge(_ text: String, isMuted: Bool) -> some View {
         Text(text)
-            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.white.opacity(0.80))
+            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+            .lineLimit(1)
+            .foregroundStyle(isMuted ? TotalMixTheme.textPrimary : TotalMixTheme.textSecondary)
             .padding(.horizontal, 6.5)
             .padding(.vertical, 2.5)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.12))
+                    .fill(isMuted ? TotalMixTheme.rmeRedDeep : TotalMixTheme.surfaceControl)
             )
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(
+                        isMuted ? TotalMixTheme.rmeRed.opacity(0.7) : TotalMixTheme.borderSubtle,
+                        lineWidth: 0.75
+                    )
+            )
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     private func meterBar(for payload: HUDPayload, isOverUnity: Bool) -> some View {
@@ -213,23 +232,44 @@ public struct HUDContentView: View {
             let unityX = max(0, min(width - 1.5, width * CGFloat(payload.unityNormalizedPosition)))
 
             ZStack(alignment: .leading) {
-                // Track
-                Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.13))
-                    .frame(height: 7)
+                // Single clipped 8pt bar housing track, amber guarded zone, and active level fill
+                ZStack(alignment: .leading) {
+                    TotalMixTheme.chassisDeep.opacity(0.92)
 
-                // Active level fill (zero implicit animation lag)
-                if fillWidth > 0.5 {
-                    Capsule(style: .continuous)
-                        .fill(barGradient(for: payload, isOverUnity: isOverUnity))
-                        .frame(width: max(7, fillWidth), height: 7)
+                    if let limitPos = payload.safetyLimitNormalizedPosition {
+                        let limitX = max(0, min(width - 2.0, width * CGFloat(limitPos)))
+                        TotalMixTheme.rmeAmber.opacity(0.20)
+                            .frame(width: max(0, width - limitX))
+                            .offset(x: limitX)
+                    }
+
+                    if fillWidth > 0.5 {
+                        Capsule(style: .continuous)
+                            .fill(barGradient(for: payload, isOverUnity: isOverUnity))
+                            .frame(width: max(8, fillWidth))
+                    }
                 }
+                .frame(width: width, height: 8)
+                .clipShape(Capsule(style: .continuous))
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(TotalMixTheme.borderSubtle.opacity(0.75), lineWidth: 0.7)
+                )
 
                 // 0.0 dB unity reference tick line
                 Rectangle()
-                    .fill(Color.white.opacity(0.88))
+                    .fill(TotalMixTheme.textPrimary.opacity(0.78))
                     .frame(width: 1.5, height: 13)
                     .offset(x: unityX)
+
+                // Custom safety ceiling stop tick line (if enabled)
+                if let limitPos = payload.safetyLimitNormalizedPosition {
+                    let limitTickX = max(0, min(width - 2.0, width * CGFloat(limitPos) - 1.0))
+                    Rectangle()
+                        .fill(TotalMixTheme.rmeAmber)
+                        .frame(width: 2.0, height: 13)
+                        .offset(x: limitTickX)
+                }
             }
             .frame(maxHeight: .infinity, alignment: .center)
             .transaction { tx in
@@ -241,30 +281,30 @@ public struct HUDContentView: View {
 
     private func iconColor(for payload: HUDPayload) -> Color {
         if payload.isMuted {
-            return Color(red: 1.0, green: 0.38, blue: 0.36)
+            return TotalMixTheme.rmeRed
         }
         if payload.hitZeroDbLock {
-            return Color(red: 1.0, green: 0.76, blue: 0.28)
+            return TotalMixTheme.rmeAmber
         }
-        return Color(red: 0.32, green: 0.84, blue: 0.96)
+        return TotalMixTheme.rmeGreenBright
     }
 
     private func readoutColor(for payload: HUDPayload, isOverUnity: Bool) -> Color {
         if payload.isMuted {
-            return Color(red: 1.0, green: 0.42, blue: 0.40)
+            return TotalMixTheme.rmeRed
         }
         if payload.hitZeroDbLock || isOverUnity {
-            return Color(red: 1.0, green: 0.80, blue: 0.34)
+            return TotalMixTheme.rmeAmber
         }
-        return Color.white.opacity(0.98)
+        return TotalMixTheme.textPrimary
     }
 
     private func barGradient(for payload: HUDPayload, isOverUnity: Bool) -> LinearGradient {
         if payload.isMuted {
             return LinearGradient(
                 colors: [
-                    Color.white.opacity(0.26),
-                    Color(red: 0.92, green: 0.36, blue: 0.35).opacity(0.65)
+                    TotalMixTheme.rmeRedDeep.opacity(0.70),
+                    TotalMixTheme.rmeRed.opacity(0.85)
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
@@ -273,8 +313,9 @@ public struct HUDContentView: View {
         if isOverUnity {
             return LinearGradient(
                 colors: [
-                    Color(red: 0.24, green: 0.78, blue: 0.95),
-                    Color(red: 1.0, green: 0.68, blue: 0.20)
+                    TotalMixTheme.rmeGreen,
+                    TotalMixTheme.rmeAmber,
+                    TotalMixTheme.rmeRed
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
@@ -282,8 +323,9 @@ public struct HUDContentView: View {
         }
         return LinearGradient(
             colors: [
-                Color(red: 0.20, green: 0.72, blue: 0.96),
-                Color(red: 0.28, green: 0.92, blue: 0.78)
+                TotalMixTheme.rmeGreenDeep,
+                TotalMixTheme.rmeGreen,
+                TotalMixTheme.rmeGreenBright
             ],
             startPoint: .leading,
             endPoint: .trailing

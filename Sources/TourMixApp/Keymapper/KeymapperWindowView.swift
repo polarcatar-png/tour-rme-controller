@@ -59,7 +59,7 @@ public struct KeymapperWindowView: View {
         VStack(spacing: 0) {
             topToolbar
             Divider()
-                .overlay(Color.white.opacity(0.08))
+                .overlay(TotalMixTheme.borderSubtle)
 
             Group {
                 switch selectedTab {
@@ -74,7 +74,8 @@ public struct KeymapperWindowView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 860, idealWidth: 940, minHeight: 560, idealHeight: 630)
-        .background(Color(red: 0.08, green: 0.09, blue: 0.11))
+        .background(TotalMixTheme.windowBackground)
+        .tint(TotalMixTheme.accent)
         .preferredColorScheme(.dark)
         .onChange(of: engine.activeProfile.id) { _, _ in
             if let mod = editingModifier, !engine.activeProfile.modifierButtons.contains(mod) {
@@ -142,23 +143,24 @@ public struct KeymapperWindowView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "square.stack.3d.up.fill")
                             .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(Color(red: 0.34, green: 0.84, blue: 0.98))
+                            .foregroundStyle(TotalMixTheme.accent)
                         Text(engine.activeProfile.name)
                             .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(TotalMixTheme.textPrimary)
                             .lineLimit(1)
                         Image(systemName: "chevron.down")
                             .font(.system(size: 9.5, weight: .bold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.white.opacity(0.07))
+                            .fill(TotalMixTheme.stripSurfaceTop)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+                            .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.8)
                     )
                 }
                 .menuStyle(.borderlessButton)
@@ -206,11 +208,11 @@ public struct KeymapperWindowView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.75))
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                         .frame(width: 26, height: 26)
                         .background(
                             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(Color.white.opacity(0.06))
+                                .fill(TotalMixTheme.surfaceControl)
                         )
                 }
                 .menuStyle(.borderlessButton)
@@ -233,17 +235,17 @@ public struct KeymapperWindowView: View {
                             Text(tab.title)
                                 .font(.system(size: 12, weight: active ? .semibold : .medium))
                         }
-                        .foregroundStyle(active ? Color.white : Color.white.opacity(0.62))
+                        .foregroundStyle(active ? TotalMixTheme.textPrimary : TotalMixTheme.textSecondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(active ? Color(red: 0.20, green: 0.52, blue: 0.86).opacity(0.45) : Color.clear)
+                                .fill(active ? TotalMixTheme.accentDeep.opacity(0.62) : Color.clear)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .strokeBorder(
-                                    active ? Color(red: 0.36, green: 0.82, blue: 0.98).opacity(0.65) : Color.clear,
+                                    active ? TotalMixTheme.accent.opacity(0.85) : Color.clear,
                                     lineWidth: 0.9
                                 )
                         )
@@ -254,7 +256,7 @@ public struct KeymapperWindowView: View {
             .padding(3)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.black.opacity(0.28))
+                    .fill(TotalMixTheme.chassisDeep)
             )
 
             Spacer(minLength: 8)
@@ -280,7 +282,7 @@ public struct KeymapperWindowView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color(red: 0.10, green: 0.11, blue: 0.14))
+        .background(TotalMixTheme.toolbarBackground)
     }
 
     private func connectionPill(
@@ -294,23 +296,23 @@ public struct KeymapperWindowView: View {
                 Circle()
                     .fill(
                         isOnline
-                            ? Color(red: 0.22, green: 0.88, blue: 0.52)
-                            : (isWarning ? Color.orange : Color.white.opacity(0.30))
+                            ? TotalMixTheme.rmeGreen
+                            : (isWarning ? TotalMixTheme.rmeAmber : TotalMixTheme.textMuted)
                     )
                     .frame(width: 7, height: 7)
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.84))
+                    .foregroundStyle(TotalMixTheme.textPrimary)
             }
             .padding(.horizontal, 8.5)
             .padding(.vertical, 4.5)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.05))
+                    .fill(TotalMixTheme.stripSurfaceTop)
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.75)
+                    .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.75)
             )
         }
         .buttonStyle(.plain)
@@ -387,11 +389,11 @@ public struct KeymapperWindowView: View {
                 Label("转动或按压真机实时发光", systemImage: "bolt.horizontal.fill")
             }
             .font(.system(size: 11))
-            .foregroundStyle(Color.white.opacity(0.45))
+            .foregroundStyle(TotalMixTheme.textMuted)
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
-        .background(Color(red: 0.07, green: 0.08, blue: 0.10))
+        .background(TotalMixTheme.canvasDeck)
     }
 
     private func layerCapsuleButton(
@@ -409,27 +411,27 @@ public struct KeymapperWindowView: View {
                     .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
                 if isPhysicallyHeld {
                     Circle()
-                        .fill(Color(red: 1.0, green: 0.75, blue: 0.25))
+                        .fill(TotalMixTheme.rmeAmber)
                         .frame(width: 6, height: 6)
                 }
             }
-            .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.68))
+            .foregroundStyle(isSelected ? TotalMixTheme.textPrimary : TotalMixTheme.textSecondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
                 Capsule(style: .continuous)
                     .fill(
                         isSelected
-                            ? Color(red: 0.18, green: 0.58, blue: 0.88).opacity(0.42)
-                            : Color.white.opacity(0.06)
+                            ? TotalMixTheme.accentDeep.opacity(0.55)
+                            : TotalMixTheme.stripSurfaceTop
                     )
             )
             .overlay(
                 Capsule(style: .continuous)
                     .strokeBorder(
                         isSelected
-                            ? Color(red: 0.36, green: 0.84, blue: 0.98).opacity(0.75)
-                            : Color.white.opacity(0.10),
+                            ? TotalMixTheme.accent.opacity(0.85)
+                            : TotalMixTheme.borderSubtle,
                         lineWidth: 0.85
                     )
             )
@@ -453,10 +455,10 @@ public struct KeymapperWindowView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Label("当前正在编辑「按住 \(activeMod.displayName)」组合层", systemImage: "info.circle.fill")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color(red: 0.34, green: 0.86, blue: 0.96))
+                                .foregroundStyle(TotalMixTheme.accent)
                             Text("在此层级下按住 \(activeMod.displayName) 的同时旋转 Knob/Scroll 或点按其它按键即可触发组合动作。若需设置单独轻点 \(activeMod.displayName) 松开时的自身动作，请切回「基础层」。")
                                 .font(.system(size: 12))
-                                .foregroundStyle(Color.white.opacity(0.68))
+                                .foregroundStyle(TotalMixTheme.textSecondary)
                             Button("切回基础层编辑自身单击动作") {
                                 editingModifier = nil
                             }
@@ -524,7 +526,7 @@ public struct KeymapperWindowView: View {
             }
             .padding(18)
         }
-        .background(Color(red: 0.09, green: 0.10, blue: 0.13))
+        .background(TotalMixTheme.windowBackground)
     }
 
     private func controlHeaderCard(profile: ProfileConfig, button: TourBoxButton) -> some View {
@@ -538,22 +540,22 @@ public struct KeymapperWindowView: View {
                         HStack(spacing: 8) {
                             Text(selectedControl.displayName)
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(Color.white)
+                                .foregroundStyle(TotalMixTheme.textPrimary)
 
                             Text(editingModifier == nil ? "基础层" : "按住 \(editingModifier!.controlId.shortTitle) 组合层")
                                 .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color(red: 0.36, green: 0.86, blue: 0.98))
+                                .foregroundStyle(TotalMixTheme.accentLight)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
                                 .background(
                                     Capsule(style: .continuous)
-                                        .fill(Color(red: 0.20, green: 0.62, blue: 0.92).opacity(0.22))
+                                        .fill(TotalMixTheme.accentDeep.opacity(0.45))
                                 )
                         }
 
                         Text(selectedControl.locationDescription)
                             .font(.system(size: 12))
-                            .foregroundStyle(Color.white.opacity(0.58))
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                     }
 
                     Spacer()
@@ -561,7 +563,7 @@ public struct KeymapperWindowView: View {
 
                 if isStandaloneButton && editingModifier == nil {
                     Divider()
-                        .overlay(Color.white.opacity(0.08))
+                        .overlay(TotalMixTheme.borderSubtle)
 
                     Toggle(
                         isOn: Binding(
@@ -576,7 +578,7 @@ public struct KeymapperWindowView: View {
                                 .font(.system(size: 12.5, weight: .semibold))
                             Text("开启后可按住此键配合 Knob / Scroll 或其它按键组成第二层快捷映射")
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color.white.opacity(0.52))
+                                .foregroundStyle(TotalMixTheme.textSecondary)
                         }
                     }
                     .toggleStyle(.switch)
@@ -656,7 +658,7 @@ public struct KeymapperWindowView: View {
                         systemImage: rotary == .knob ? "dial.medium.fill" : "arrow.up.and.down.circle.fill"
                     )
                     .font(.system(size: 13.5, weight: .bold))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(TotalMixTheme.textPrimary)
 
                     Spacer()
 
@@ -666,7 +668,7 @@ public struct KeymapperWindowView: View {
                         }
                         .buttonStyle(.plain)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.55))
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                     }
                 }
 
@@ -679,9 +681,21 @@ public struct KeymapperWindowView: View {
                             case .none:
                                 .none
                             case .rmeOutput:
-                                .rmeOutputFader(channelIndex: 0, ballistics: .standard, safetyClamp0dB: true)
+                                .rmeOutputFader(
+                                    channelIndex: 0,
+                                    ballistics: .standard,
+                                    safetyClamp0dB: true,
+                                    safetyMaxDb: VolumeSafetyLimit.defaultMaxDb
+                                )
                             case .rmeSubmix:
-                                .rmeSubmixFader(sourceBus: .playback, sourceIndex: 0, outputIndex: 0, ballistics: .standard, safetyClamp0dB: true)
+                                .rmeSubmixFader(
+                                    sourceBus: .playback,
+                                    sourceIndex: 0,
+                                    outputIndex: 0,
+                                    ballistics: .standard,
+                                    safetyClamp0dB: true,
+                                    safetyMaxDb: VolumeSafetyLimit.defaultMaxDb
+                                )
                             case .mouseScroll:
                                 .mouseScroll(.standard)
                             case .systemVolume:
@@ -706,10 +720,10 @@ public struct KeymapperWindowView: View {
                 case .none:
                     Text("当前未绑定任何动作，旋转时不会发送指令。")
                         .font(.system(size: 11.5))
-                        .foregroundStyle(Color.white.opacity(0.48))
+                        .foregroundStyle(TotalMixTheme.textSecondary)
 
-                case .rmeOutputFader(let chIndex, let ballistics, let safetyClamp):
-                    Divider().overlay(Color.white.opacity(0.08))
+                case .rmeOutputFader(let chIndex, let ballistics, let safetyClamp, let safetyMaxDb):
+                    Divider().overlay(TotalMixTheme.borderSubtle)
                     channelPickerRow(
                         label: "目标输出通道",
                         bus: .output,
@@ -718,7 +732,12 @@ public struct KeymapperWindowView: View {
                         engine.setRotaryBinding(
                             rotary,
                             modifier: editingModifier,
-                            action: .rmeOutputFader(channelIndex: newCh, ballistics: ballistics, safetyClamp0dB: safetyClamp)
+                            action: .rmeOutputFader(
+                                channelIndex: newCh,
+                                ballistics: ballistics,
+                                safetyClamp0dB: safetyClamp,
+                                safetyMaxDb: safetyMaxDb
+                            )
                         )
                     }
 
@@ -726,29 +745,34 @@ public struct KeymapperWindowView: View {
                         engine.setRotaryBinding(
                             rotary,
                             modifier: editingModifier,
-                            action: .rmeOutputFader(channelIndex: chIndex, ballistics: updatedBallistics, safetyClamp0dB: safetyClamp)
+                            action: .rmeOutputFader(
+                                channelIndex: chIndex,
+                                ballistics: updatedBallistics,
+                                safetyClamp0dB: safetyClamp,
+                                safetyMaxDb: safetyMaxDb
+                            )
                         )
                     }
 
-                    Toggle(
-                        "开启 0.0 dB 过载安全限位锁（防止顺时针快拧冲过 0 dB 爆音）",
-                        isOn: Binding(
-                            get: { safetyClamp },
-                            set: { newClamp in
-                                engine.setRotaryBinding(
-                                    rotary,
-                                    modifier: editingModifier,
-                                    action: .rmeOutputFader(channelIndex: chIndex, ballistics: ballistics, safetyClamp0dB: newClamp)
-                                )
-                            }
+                    safetyCeilingEditorSection(
+                        enabled: safetyClamp,
+                        maxDb: safetyMaxDb,
+                        title: "开启音量上限保护锁（防止顺时针快拧意外过载爆音）"
+                    ) { newEnabled, newMaxDb in
+                        engine.setRotaryBinding(
+                            rotary,
+                            modifier: editingModifier,
+                            action: .rmeOutputFader(
+                                channelIndex: chIndex,
+                                ballistics: ballistics,
+                                safetyClamp0dB: newEnabled,
+                                safetyMaxDb: newMaxDb
+                            )
                         )
-                    )
-                    .font(.system(size: 12))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                    }
 
-                case .rmeSubmixFader(let srcBus, let srcIdx, let outIdx, let ballistics, let safetyClamp):
-                    Divider().overlay(Color.white.opacity(0.08))
+                case .rmeSubmixFader(let srcBus, let srcIdx, let outIdx, let ballistics, let safetyClamp, let safetyMaxDb):
+                    Divider().overlay(TotalMixTheme.borderSubtle)
 
                     Picker(
                         "音源总线",
@@ -758,7 +782,14 @@ public struct KeymapperWindowView: View {
                                 engine.setRotaryBinding(
                                     rotary,
                                     modifier: editingModifier,
-                                    action: .rmeSubmixFader(sourceBus: newBus, sourceIndex: 0, outputIndex: outIdx, ballistics: ballistics, safetyClamp0dB: safetyClamp)
+                                    action: .rmeSubmixFader(
+                                        sourceBus: newBus,
+                                        sourceIndex: 0,
+                                        outputIndex: outIdx,
+                                        ballistics: ballistics,
+                                        safetyClamp0dB: safetyClamp,
+                                        safetyMaxDb: safetyMaxDb
+                                    )
                                 )
                             }
                         )
@@ -771,7 +802,14 @@ public struct KeymapperWindowView: View {
                         engine.setRotaryBinding(
                             rotary,
                             modifier: editingModifier,
-                            action: .rmeSubmixFader(sourceBus: srcBus, sourceIndex: newSrc, outputIndex: outIdx, ballistics: ballistics, safetyClamp0dB: safetyClamp)
+                            action: .rmeSubmixFader(
+                                sourceBus: srcBus,
+                                sourceIndex: newSrc,
+                                outputIndex: outIdx,
+                                ballistics: ballistics,
+                                safetyClamp0dB: safetyClamp,
+                                safetyMaxDb: safetyMaxDb
+                            )
                         )
                     }
 
@@ -779,7 +817,14 @@ public struct KeymapperWindowView: View {
                         engine.setRotaryBinding(
                             rotary,
                             modifier: editingModifier,
-                            action: .rmeSubmixFader(sourceBus: srcBus, sourceIndex: srcIdx, outputIndex: newOut, ballistics: ballistics, safetyClamp0dB: safetyClamp)
+                            action: .rmeSubmixFader(
+                                sourceBus: srcBus,
+                                sourceIndex: srcIdx,
+                                outputIndex: newOut,
+                                ballistics: ballistics,
+                                safetyClamp0dB: safetyClamp,
+                                safetyMaxDb: safetyMaxDb
+                            )
                         )
                     }
 
@@ -787,29 +832,38 @@ public struct KeymapperWindowView: View {
                         engine.setRotaryBinding(
                             rotary,
                             modifier: editingModifier,
-                            action: .rmeSubmixFader(sourceBus: srcBus, sourceIndex: srcIdx, outputIndex: outIdx, ballistics: updatedBallistics, safetyClamp0dB: safetyClamp)
+                            action: .rmeSubmixFader(
+                                sourceBus: srcBus,
+                                sourceIndex: srcIdx,
+                                outputIndex: outIdx,
+                                ballistics: updatedBallistics,
+                                safetyClamp0dB: safetyClamp,
+                                safetyMaxDb: safetyMaxDb
+                            )
                         )
                     }
 
-                    Toggle(
-                        "开启 0.0 dB 发送上限保护锁",
-                        isOn: Binding(
-                            get: { safetyClamp },
-                            set: { newClamp in
-                                engine.setRotaryBinding(
-                                    rotary,
-                                    modifier: editingModifier,
-                                    action: .rmeSubmixFader(sourceBus: srcBus, sourceIndex: srcIdx, outputIndex: outIdx, ballistics: ballistics, safetyClamp0dB: newClamp)
-                                )
-                            }
+                    safetyCeilingEditorSection(
+                        enabled: safetyClamp,
+                        maxDb: safetyMaxDb,
+                        title: "开启子混音发送上限保护锁"
+                    ) { newEnabled, newMaxDb in
+                        engine.setRotaryBinding(
+                            rotary,
+                            modifier: editingModifier,
+                            action: .rmeSubmixFader(
+                                sourceBus: srcBus,
+                                sourceIndex: srcIdx,
+                                outputIndex: outIdx,
+                                ballistics: ballistics,
+                                safetyClamp0dB: newEnabled,
+                                safetyMaxDb: newMaxDb
+                            )
                         )
-                    )
-                    .font(.system(size: 12))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                    }
 
                 case .mouseScroll(let scrollCfg):
-                    Divider().overlay(Color.white.opacity(0.08))
+                    Divider().overlay(TotalMixTheme.borderSubtle)
                     VStack(alignment: .leading, spacing: 10) {
                         Picker(
                             "滚动手感模式",
@@ -846,7 +900,7 @@ public struct KeymapperWindowView: View {
                         HStack(spacing: 6) {
                             Text("每格步幅速度：")
                                 .font(.system(size: 12))
-                                .foregroundStyle(Color.white.opacity(0.82))
+                                .foregroundStyle(TotalMixTheme.textSecondary)
                             ForEach([(1, "1 慢"), (2, "2 柔"), (3, "3 标准"), (4, "4 快"), (5, "5 极快")], id: \.0) { tier, label in
                                 Button(label) {
                                     var updated = scrollCfg
@@ -854,7 +908,7 @@ public struct KeymapperWindowView: View {
                                     engine.setRotaryBinding(rotary, modifier: editingModifier, action: .mouseScroll(updated))
                                 }
                                 .buttonStyle(.bordered)
-                                .tint(scrollCfg.speed == tier ? .accentColor : .secondary)
+                                .tint(scrollCfg.speed == tier ? TotalMixTheme.accent : TotalMixTheme.textSecondary)
                                 .controlSize(.small)
                             }
                         }
@@ -891,7 +945,7 @@ public struct KeymapperWindowView: View {
 
                         Text("小提示：若想同时获得完整鼠标中键体验，可在下方「按压动作」卡片中选择「鼠标中键 / 左键 / 右键点击」。")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color.white.opacity(0.55))
+                            .foregroundStyle(TotalMixTheme.textSecondary)
 
                         accessibilityPermissionBannerIfNeeded
                     }
@@ -899,10 +953,10 @@ public struct KeymapperWindowView: View {
                 case .systemVolume:
                     Text("通过 macOS 原生媒体事件直接调节当前系统默认音频输出音量（无需辅助功能权限）。")
                         .font(.system(size: 11.5))
-                        .foregroundStyle(Color.white.opacity(0.60))
+                        .foregroundStyle(TotalMixTheme.textSecondary)
 
                 case .keyPair(let cw, let ccw):
-                    Divider().overlay(Color.white.opacity(0.08))
+                    Divider().overlay(TotalMixTheme.borderSubtle)
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text(rotary.directionDisplayName(.cw))
@@ -929,6 +983,113 @@ public struct KeymapperWindowView: View {
                         accessibilityPermissionBannerIfNeeded
                     }
                 }
+            }
+        }
+    }
+
+    private func safetyCeilingEditorSection(
+        enabled: Bool,
+        maxDb: Double,
+        title: String,
+        onChange: @escaping (Bool, Double) -> Void
+    ) -> some View {
+        let effectiveMaxDb = VolumeSafetyLimit.clampCeilingDb(maxDb)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Toggle(
+                title,
+                isOn: Binding(
+                    get: { enabled },
+                    set: { newEnabled in
+                        onChange(newEnabled, effectiveMaxDb)
+                    }
+                )
+            )
+            .font(.system(size: 12))
+            .toggleStyle(.switch)
+            .controlSize(.small)
+
+            if enabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Text("最高音量上限")
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(TotalMixTheme.textSecondary)
+
+                        Text(VolumeSafetyLimit.formatLimitDb(effectiveMaxDb))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(TotalMixTheme.rmeAmber)
+
+                        Spacer()
+
+                        Button("-0.5 dB") {
+                            onChange(true, VolumeSafetyLimit.clampCeilingDb(effectiveMaxDb - 0.5))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+
+                        Button("+0.5 dB") {
+                            onChange(true, VolumeSafetyLimit.clampCeilingDb(effectiveMaxDb + 0.5))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                    }
+
+                    HStack(spacing: 5) {
+                        ForEach(VolumeSafetyLimit.quickPresetsDb, id: \.self) { preset in
+                            let selected = abs(effectiveMaxDb - preset) < 0.25
+                            Button {
+                                onChange(true, preset)
+                            } label: {
+                                Text(VolumeSafetyLimit.formatLimitDb(preset))
+                                    .font(.system(size: 10.5, weight: selected ? .bold : .medium, design: .rounded))
+                                    .monospacedDigit()
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3.5)
+                                    .foregroundStyle(selected ? TotalMixTheme.chassisDeep : TotalMixTheme.textPrimary)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                            .fill(selected ? TotalMixTheme.rmeAmber : TotalMixTheme.surfaceControl)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    VStack(spacing: 3) {
+                        Slider(
+                            value: Binding(
+                                get: { effectiveMaxDb },
+                                set: { rawVal in
+                                    let snapped = (rawVal * 2.0).rounded() / 2.0
+                                    onChange(true, VolumeSafetyLimit.clampCeilingDb(snapped))
+                                }
+                            ),
+                            in: VolumeSafetyLimit.minConfigurableDb...VolumeSafetyLimit.maxConfigurableDb
+                        )
+                        .tint(TotalMixTheme.rmeAmber)
+
+                        HStack {
+                            Text("-60 dB")
+                            Spacer()
+                            Text("步进 0.5 dB")
+                            Spacer()
+                            Text("+6 dB")
+                        }
+                        .font(.system(size: 9.5, design: .monospaced))
+                        .foregroundStyle(TotalMixTheme.textMuted)
+                    }
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(TotalMixTheme.chassisDeep)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(TotalMixTheme.rmeAmber.opacity(0.32), lineWidth: 0.85)
+                        )
+                )
             }
         }
     }
@@ -966,14 +1127,14 @@ public struct KeymapperWindowView: View {
                 HStack(spacing: 8) {
                     Text("每格固定步进：")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.white.opacity(0.75))
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                     ForEach([0.2, 0.5, 1.0, 2.0], id: \.self) { step in
                         let selected = abs(fixedValue - step) < 0.01
                         Button(String(format: "%.1f dB", step)) {
                             onChange(.fixed(db: step))
                         }
                         .buttonStyle(.bordered)
-                        .tint(selected ? .accentColor : .secondary)
+                        .tint(selected ? TotalMixTheme.accent : TotalMixTheme.textSecondary)
                         .controlSize(.small)
                     }
                 }
@@ -1037,10 +1198,10 @@ public struct KeymapperWindowView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
                             .font(.system(size: 13.5, weight: .bold))
-                            .foregroundStyle(Color.white)
+                            .foregroundStyle(TotalMixTheme.textPrimary)
                         Text(subtitle)
                             .font(.system(size: 11))
-                            .foregroundStyle(Color.white.opacity(0.52))
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                     }
 
                     Spacer()
@@ -1051,7 +1212,7 @@ public struct KeymapperWindowView: View {
                         }
                         .buttonStyle(.plain)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.55))
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                     }
                 }
 
@@ -1111,7 +1272,7 @@ public struct KeymapperWindowView: View {
                 .foregroundStyle(Color.white.opacity(0.52))
 
         case .rmeSetOutputDb(let chIndex, let targetDb):
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(TotalMixTheme.borderSubtle)
             channelPickerRow(label: "目标输出通道", bus: .output, selectedIndex: chIndex) { newCh in
                 onUpdate(.rmeSetOutputDb(channelIndex: newCh, targetDb: targetDb))
             }
@@ -1123,7 +1284,7 @@ public struct KeymapperWindowView: View {
                     Text(RMEFaderCurve.formatDb(targetDb))
                         .font(.system(size: 12.5, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(Color(red: 0.36, green: 0.86, blue: 0.98))
+                        .foregroundStyle(TotalMixTheme.accent)
                     Spacer()
                 }
 
@@ -1186,14 +1347,14 @@ public struct KeymapperWindowView: View {
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "speaker.wave.2.bubble.left.fill")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.orange)
+                    .foregroundStyle(TotalMixTheme.rmeAmber)
                 Text("作用于 TotalMix Control Room 的 Main Out（当前为 \(engine.totalMix.mainOutDisplayName)）。若需单独静音 AN 1/2 等指定输出，请选择「RME 指定输出通道静音」。")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.white.opacity(0.62))
+                    .foregroundStyle(TotalMixTheme.textSecondary)
             }
 
         case .rmeSnapshot(let slot):
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(TotalMixTheme.borderSubtle)
             HStack(spacing: 6) {
                 Text("快照槽位：")
                     .font(.system(size: 12))
@@ -1202,13 +1363,13 @@ public struct KeymapperWindowView: View {
                         onUpdate(.rmeSnapshot(idx))
                     }
                     .buttonStyle(.bordered)
-                    .tint(slot == idx ? .accentColor : .secondary)
+                    .tint(slot == idx ? TotalMixTheme.accent : TotalMixTheme.textSecondary)
                     .controlSize(.small)
                 }
             }
 
         case .rmeLayout(let preset):
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(TotalMixTheme.borderSubtle)
             HStack(spacing: 6) {
                 Text("布局预设：")
                     .font(.system(size: 12))
@@ -1217,7 +1378,7 @@ public struct KeymapperWindowView: View {
                         onUpdate(.rmeLayout(idx))
                     }
                     .buttonStyle(.bordered)
-                    .tint(preset == idx ? .accentColor : .secondary)
+                    .tint(preset == idx ? TotalMixTheme.accent : TotalMixTheme.textSecondary)
                     .controlSize(.small)
                 }
             }
@@ -1225,10 +1386,10 @@ public struct KeymapperWindowView: View {
         case .rmeToggleWindow:
             Text("一键在前台唤出或隐藏 RME TotalMix FX 混音窗口（`/showwindow`）。")
                 .font(.system(size: 11.5))
-                .foregroundStyle(Color.white.opacity(0.58))
+                .foregroundStyle(TotalMixTheme.textSecondary)
 
         case .keyShortcut(let combo):
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(TotalMixTheme.borderSubtle)
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("绑定按键：")
@@ -1243,12 +1404,12 @@ public struct KeymapperWindowView: View {
                 }
                 Text("支持直接录入任意单个按键（如 Space、B、Delete、Esc、方向键）、单独修饰键（点按一下 Shift / Option / Command 即可绑定按住生效）或组合快捷键，也可点右侧键盘菜单直接点选。")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.white.opacity(0.55))
+                    .foregroundStyle(TotalMixTheme.textSecondary)
                 accessibilityPermissionBannerIfNeeded
             }
 
         case .mouseClick(let mouseBtn):
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(TotalMixTheme.borderSubtle)
             VStack(alignment: .leading, spacing: 8) {
                 Picker(
                     "鼠标按键",
@@ -1263,12 +1424,12 @@ public struct KeymapperWindowView: View {
                 }
                 Text("支持单击与按住持续生效（例如将 Scroll 按压设为「鼠标中键」，既能单击关闭网页标签/后台打开链接，也能按住滚轮在 DAW / Figma / 3D 软件中拖拽平移画布）。")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.white.opacity(0.55))
+                    .foregroundStyle(TotalMixTheme.textSecondary)
                 accessibilityPermissionBannerIfNeeded
             }
 
         case .mediaKey(let media):
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(TotalMixTheme.borderSubtle)
             Picker(
                 "媒体功能",
                 selection: Binding<MediaKeyAction>(
@@ -1284,15 +1445,15 @@ public struct KeymapperWindowView: View {
         case .cycleProfile:
             Text("在已创建的 \(engine.configuration.profiles.count) 套预设之间循环切换，并在屏幕弹出 HUD 提示。")
                 .font(.system(size: 11.5))
-                .foregroundStyle(Color.white.opacity(0.58))
+                .foregroundStyle(TotalMixTheme.textSecondary)
 
         case .openKeymapper:
             Text("一键打开并置顶本 TourMix 控制台窗口。")
                 .font(.system(size: 11.5))
-                .foregroundStyle(Color.white.opacity(0.58))
+                .foregroundStyle(TotalMixTheme.textSecondary)
 
         case .shellCommand(let cmd):
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(TotalMixTheme.borderSubtle)
             scriptEditorSection(
                 placeholder: "例如: open -a 'Totalmix'",
                 text: cmd,
@@ -1306,7 +1467,7 @@ public struct KeymapperWindowView: View {
             )
 
         case .appleScript(let source):
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(TotalMixTheme.borderSubtle)
             scriptEditorSection(
                 placeholder: "例如: tell application \"Music\" to playpause",
                 text: source,
@@ -1361,10 +1522,10 @@ public struct KeymapperWindowView: View {
             HStack(spacing: 8) {
                 Image(systemName: "hand.raised.fill")
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.orange)
+                    .foregroundStyle(TotalMixTheme.rmeAmber)
                 Text("发送键盘快捷键需在系统设置中勾选「辅助功能」权限（仅控 RME 无需此权限）。")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.white.opacity(0.78))
+                    .foregroundStyle(TotalMixTheme.textPrimary)
                 Spacer()
                 Button("请求授权") {
                     _ = engine.actionExecutor.isAccessibilityTrusted(prompt: true)
@@ -1381,7 +1542,11 @@ public struct KeymapperWindowView: View {
             .padding(8)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.orange.opacity(0.12))
+                    .fill(TotalMixTheme.rmeAmber.opacity(0.14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(TotalMixTheme.rmeAmber.opacity(0.4), lineWidth: 0.75)
+                    )
             )
         }
     }
@@ -1410,7 +1575,7 @@ public struct KeymapperWindowView: View {
                 if let status = scriptTestStatus {
                     Text(status)
                         .font(.system(size: 11))
-                        .foregroundStyle(Color.white.opacity(0.65))
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                 }
             }
         }
@@ -1438,12 +1603,12 @@ public struct KeymapperWindowView: View {
                                     .font(.system(size: 12.5, weight: .semibold))
                                 Text("转动旋钮或静音时在当前光标所在屏幕底部浮现音量条，穿透全屏 DAW / 视频且绝不抢夺焦点")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(Color.white.opacity(0.55))
+                                    .foregroundStyle(TotalMixTheme.textSecondary)
                             }
                         }
                         .toggleStyle(.switch)
 
-                        Divider().overlay(Color.white.opacity(0.08))
+                        Divider().overlay(TotalMixTheme.borderSubtle)
 
                         Toggle(
                             isOn: Binding(
@@ -1456,7 +1621,7 @@ public struct KeymapperWindowView: View {
                                     .font(.system(size: 12.5, weight: .semibold))
                                 Text("采用等宽数字字体零抖动展示当前预设主通道（如 AN 1/2）实时音量")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(Color.white.opacity(0.55))
+                                    .foregroundStyle(TotalMixTheme.textSecondary)
                             }
                         }
                         .toggleStyle(.switch)
@@ -1479,7 +1644,7 @@ public struct KeymapperWindowView: View {
                         .font(.system(size: 12.5, weight: .semibold))
                         .toggleStyle(.switch)
 
-                        Divider().overlay(Color.white.opacity(0.08))
+                        Divider().overlay(TotalMixTheme.borderSubtle)
 
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(engine.configuration.profiles) { profile in
@@ -1537,7 +1702,7 @@ public struct KeymapperWindowView: View {
                                     .font(.system(size: 12, weight: .semibold))
                                 Text(launchManager.currentBundlePath)
                                     .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(Color.white.opacity(0.58))
+                                    .foregroundStyle(TotalMixTheme.textSecondary)
                                     .textSelection(.enabled)
                             }
                             Spacer()
@@ -1550,11 +1715,11 @@ public struct KeymapperWindowView: View {
                             } else {
                                 Label("已位于 Applications", systemImage: "checkmark.seal.fill")
                                     .font(.system(size: 11.5, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.24, green: 0.88, blue: 0.54))
+                                    .foregroundStyle(TotalMixTheme.rmeGreen)
                             }
                         }
 
-                        Divider().overlay(Color.white.opacity(0.08))
+                        Divider().overlay(TotalMixTheme.borderSubtle)
 
                         Toggle(
                             isOn: Binding(
@@ -1567,7 +1732,7 @@ public struct KeymapperWindowView: View {
                                     .font(.system(size: 12.5, weight: .semibold))
                                 Text("基于 ~/Library/LaunchAgents/com.soundlab.tourmix.plist 持久化，升级覆盖应用后依然稳定生效")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(Color.white.opacity(0.55))
+                                    .foregroundStyle(TotalMixTheme.textSecondary)
                             }
                         }
                         .toggleStyle(.switch)
@@ -1575,7 +1740,7 @@ public struct KeymapperWindowView: View {
                         if let err = launchManager.lastError {
                             Text(err)
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color.red)
+                                .foregroundStyle(TotalMixTheme.rmeRed)
                         }
                     }
                 }
@@ -1584,6 +1749,7 @@ public struct KeymapperWindowView: View {
             .frame(maxWidth: 780, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .background(TotalMixTheme.windowBackground)
     }
 
     // MARK: - Shared Card & Sheet Builders
@@ -1594,11 +1760,11 @@ public struct KeymapperWindowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.045))
+                    .fill(TotalMixTheme.stripCardGradient)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.09), lineWidth: 0.85)
+                    .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
             )
     }
 

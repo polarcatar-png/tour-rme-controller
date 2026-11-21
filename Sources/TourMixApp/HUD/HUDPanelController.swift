@@ -3,13 +3,13 @@ import SwiftUI
 
 /// Non-activating fullscreen-capable HUD panel controller (`#5` Critical-1 & Major-2).
 ///
-/// - Reuses a single fixed-size `300 x 84` `NSPanel` (`.nonactivatingPanel` + `.fullScreenAuxiliary`)
+/// - Reuses a single fixed-size `336 x 84` `NSPanel` (`.nonactivatingPanel` + `.fullScreenAuxiliary`)
 /// - Never steals Key Window or switches Spaces out of fullscreen DAW / video apps
 /// - Positions onto the screen currently containing the mouse cursor (`visibleFrame.minY + 72 pt`)
 /// - Uses monotonic `fadeGeneration: UInt64` + cancellable `1.2 s` `Task` to eliminate mid-fade flicker
 @MainActor
 public final class HUDPanelController {
-    public static let panelSize = NSSize(width: 300, height: 84)
+    public static let panelSize = NSSize(width: 336, height: 84)
     public static let bottomOffset: CGFloat = 72
 
     private let viewModel = HUDViewModel()

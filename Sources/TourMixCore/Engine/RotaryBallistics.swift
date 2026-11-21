@@ -108,6 +108,21 @@ public struct RotaryBallisticsState: Equatable, Sendable {
         return isClockwise ? magnitude : -magnitude
     }
 
+    /// Pure helper forwarding to `applySafetyCeilingClamp(currentDb:deltaDb:enabled:maxDb:)`.
+    public static func applySafetyCeilingClamp(
+        currentDb: Double,
+        deltaDb: Double,
+        enabled: Bool,
+        maxDb: Double = VolumeSafetyLimit.defaultMaxDb
+    ) -> (targetDb: Double, hitLimitLock: Bool) {
+        TourMixCore_applySafetyCeilingClamp(
+            currentDb: currentDb,
+            deltaDb: deltaDb,
+            enabled: enabled,
+            maxDb: maxDb
+        )
+    }
+
     /// Pure helper forwarding to `applyZeroDbSafetyClamp(currentDb:deltaDb:enabled:)`.
     public static func applyZeroDbSafetyClamp(
         currentDb: Double,
@@ -116,6 +131,61 @@ public struct RotaryBallisticsState: Equatable, Sendable {
     ) -> (targetDb: Double, hitZeroDbLock: Bool) {
         TourMixCore_applyZeroDbSafetyClamp(currentDb: currentDb, deltaDb: deltaDb, enabled: enabled)
     }
+}
+
+/// Constants and formatting helpers for configurable volume safety ceiling protection (`-60.0 ... +6.0 dB`).
+public enum VolumeSafetyLimit: Sendable {
+    public static let defaultMaxDb: Double = 0.0
+    public static let minConfigurableDb: Double = -60.0
+    public static let maxConfigurableDb: Double = RMEFaderCurve.maxDb
+    public static let quickPresetsDb: [Double] = [-24.0, -18.0, -12.0, -6.0, -3.0, 0.0, 3.0]
+
+    /// Clamps a user-configured ceiling to the safe `-60.0 ... +6.0 dB` range and normalizes `-0.0` to `0.0`.
+    public static func clampCeilingDb(_ db: Double) -> Double {
+        guard db.isFinite else { return defaultMaxDb }
+        let clamped = min(maxConfigurableDb, max(minConfigurableDb, db))
+        return abs(clamped) < 0.0005 ? 0.0 : clamped
+    }
+
+    /// Formats a ceiling value concisely (e.g. `"0 dB"`, `"-12 dB"`, `"-12.5 dB"`, `"+3 dB"`).
+    public static func formatLimitDb(_ db: Double) -> String {
+        let clamped = clampCeilingDb(db)
+        let rounded = (clamped * 10.0).rounded() / 10.0
+        if abs(rounded) < 0.05 {
+            return "0 dB"
+        }
+        let sign = rounded > 0.0 ? "+" : ""
+        let isWhole = abs(rounded - rounded.rounded()) < 0.05
+        if isWhole {
+            return "\(sign)\(Int(rounded.rounded())) dB"
+        }
+        return String(format: "%@%.1f dB", sign, rounded)
+    }
+
+    /// Formats the HUD/lock badge label (e.g. `"0 dB MAX"`, `"-12 dB MAX"`).
+    public static func formatMaxBadge(_ db: Double) -> String {
+        "\(formatLimitDb(db)) MAX"
+    }
+}
+
+/// Applies the configurable volume safety ceiling clamp when increasing volume from at or below `maxDb`.
+///
+/// - When `enabled && deltaDb > 0 && currentDb <= limitDb + 0.001 && currentDb + deltaDb > limitDb`,
+///   clamps `targetDb` to `limitDb` and returns `hitLimitLock = true`.
+/// - If `currentDb` is already above `limitDb` and the user turns counter-clockwise (`deltaDb < 0`),
+///   decreases normally without clamping.
+public func applySafetyCeilingClamp(
+    currentDb: Double,
+    deltaDb: Double,
+    enabled: Bool,
+    maxDb: Double = VolumeSafetyLimit.defaultMaxDb
+) -> (targetDb: Double, hitLimitLock: Bool) {
+    TourMixCore_applySafetyCeilingClamp(
+        currentDb: currentDb,
+        deltaDb: deltaDb,
+        enabled: enabled,
+        maxDb: maxDb
+    )
 }
 
 /// Applies the `0.0 dB` overload safety clamp when increasing volume from at or below `0.0 dB`.
@@ -138,9 +208,26 @@ private func TourMixCore_applyZeroDbSafetyClamp(
     deltaDb: Double,
     enabled: Bool
 ) -> (targetDb: Double, hitZeroDbLock: Bool) {
+    let result = TourMixCore_applySafetyCeilingClamp(
+        currentDb: currentDb,
+        deltaDb: deltaDb,
+        enabled: enabled,
+        maxDb: 0.0
+    )
+    return (targetDb: result.targetDb, hitZeroDbLock: result.hitLimitLock)
+}
+
+@inline(__always)
+private func TourMixCore_applySafetyCeilingClamp(
+    currentDb: Double,
+    deltaDb: Double,
+    enabled: Bool,
+    maxDb: Double
+) -> (targetDb: Double, hitLimitLock: Bool) {
+    let limitDb = VolumeSafetyLimit.clampCeilingDb(maxDb)
     let candidate = currentDb + deltaDb
-    if enabled && deltaDb > 0.0 && currentDb <= 0.001 && candidate > 0.0 {
-        return (targetDb: 0.0, hitZeroDbLock: true)
+    if enabled && deltaDb > 0.0 && currentDb <= limitDb + 0.001 && candidate > limitDb {
+        return (targetDb: limitDb, hitLimitLock: true)
     }
-    return (targetDb: candidate, hitZeroDbLock: false)
+    return (targetDb: candidate, hitLimitLock: false)
 }

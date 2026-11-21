@@ -135,4 +135,165 @@ struct ProfileAndCoordinatorTests {
 
         engine.stop()
     }
+
+    @Test("向后兼容旧版 config.json（缺省 safetyMaxDb 字段 + mouseScroll _0 键）无损解码")
+    func legacyConfigJsonDecodesWithoutDataLoss() throws {
+        let legacyJSON = """
+        {
+          "activeProfileId" : "00000000-0000-0000-0000-000000000001",
+          "autoSwitchByFrontmostApp" : true,
+          "oscHost" : "127.0.0.1",
+          "oscIncomingPort" : 9001,
+          "oscOutgoingPort" : 7001,
+          "profiles" : [
+            {
+              "buttonBindings" : [
+                "tall",
+                {
+                  "keyShortcut" : {
+                    "_0" : {
+                      "command" : false,
+                      "control" : false,
+                      "displayLabel" : "↩",
+                      "keyCode" : 36,
+                      "option" : false,
+                      "shift" : false
+                    }
+                  }
+                }
+              ],
+              "buttonComboBindings" : [],
+              "doublePressBindings" : [],
+              "id" : "00000000-0000-0000-0000-000000000001",
+              "modifierButtons" : [],
+              "name" : "默认监听 (AN 1\\/2)",
+              "rotaryBindings" : [
+                "scroll",
+                {
+                  "mouseScroll" : {
+                    "_0" : {
+                      "axis" : "vertical",
+                      "dynamicAcceleration" : true,
+                      "invertDirection" : false,
+                      "mode" : "mouseWheelLine",
+                      "speed" : 3
+                    }
+                  }
+                },
+                "knob",
+                {
+                  "rmeOutputFader" : {
+                    "ballistics" : {
+                      "fastStepDb" : 2.5,
+                      "fastThresholdSec" : 0.045,
+                      "mediumStepDb" : 1,
+                      "mode" : { "dynamic" : {} },
+                      "slowStepDb" : 0.2,
+                      "slowThresholdSec" : 0.11
+                    },
+                    "channelIndex" : 0,
+                    "safetyClamp0dB" : true
+                  }
+                }
+              ],
+              "rotaryComboBindings" : []
+            }
+          ],
+          "showDbInMenuBar" : false,
+          "showHUD" : true
+        }
+        """
+
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tourmix-legacy-test-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let fileURL = tempDir.appendingPathComponent("config.json")
+        try Data(legacyJSON.utf8).write(to: fileURL)
+
+        let loaded = AppConfiguration.load(from: fileURL)
+        #expect(loaded.profiles.count == 1)
+        let profile = loaded.profiles[0]
+        #expect(profile.buttonBindings[.tall] == .keyShortcut(KeyCombo(keyCode: 0x24, displayLabel: "↩")))
+        #expect(
+            profile.rotaryBindings[.scroll] == .mouseScroll(
+                MouseScrollConfig(mode: .mouseWheelLine, axis: .vertical, speed: 3)
+            )
+        )
+        #expect(
+            profile.rotaryBindings[.knob] == .rmeOutputFader(
+                channelIndex: 0,
+                ballistics: .fine,
+                safetyClamp0dB: true,
+                safetyMaxDb: 0.0
+            )
+        )
+    }
+
+    @Test("自定义 safetyMaxDb Codable 往返、切换开关保留原上限与 HUD 动态上限徽章")
+    @MainActor
+    func customSafetyLimitRoundTripAndHUD() throws {
+        var customProfile = ProfileConfig.factoryDefault
+        customProfile.rotaryBindings[.knob] = .rmeOutputFader(
+            channelIndex: 0,
+            ballistics: .standard,
+            safetyClamp0dB: true,
+            safetyMaxDb: -12.5
+        )
+        customProfile.rotaryComboBindings[.init(modifier: .tour, rotary: .knob)] = .rmeSubmixFader(
+            sourceBus: .playback,
+            sourceIndex: 0,
+            outputIndex: 6,
+            ballistics: .fine,
+            safetyClamp0dB: true,
+            safetyMaxDb: -6.0
+        )
+
+        let config = AppConfiguration(
+            profiles: [customProfile],
+            activeProfileId: customProfile.id
+        )
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(AppConfiguration.self, from: data)
+        #expect(decoded == config)
+
+        let mockNow: TimeInterval = 2000.0
+        let totalMix = TotalMixController(
+            settleSyncDebounceSeconds: 10.0,
+            nowProvider: { mockNow },
+            sendHandler: { _ in }
+        )
+        totalMix.handleIncomingMessage(.float("/output/0/volume", Float(-13.0)), timestamp: mockNow)
+
+        let engine = CoordinatorEngine(
+            configuration: config,
+            persistChangesToDisk: false,
+            totalMix: totalMix
+        )
+
+        // 切换保护开关关闭再打开：保留自定义上限 (-12.5 dB -> 后改为 -12.0 dB 测试 HUD)
+        engine.setOutputChannelSafetyClamp(channelIndex: 0, enabled: false)
+        #expect(engine.boundOutputChannels.first?.safetyClamp0dB == false)
+        #expect(engine.boundOutputChannels.first?.safetyMaxDb == -12.5)
+
+        engine.setOutputChannelSafetyLimit(channelIndex: 0, enabled: true, maxDb: -12.0)
+        #expect(engine.boundOutputChannels.first?.safetyClamp0dB == true)
+        #expect(engine.boundOutputChannels.first?.safetyMaxDb == -12.0)
+
+        var hudEvents: [CoordinatorHUDEvent] = []
+        engine.onHUDEvent = { hudEvents.append($0) }
+
+        // 从 -13.0 dB 上拧 2 格触发快速加速越过 -12.0 dB
+        engine.handleDecodedInput(.rotaryStep(.knob, .cw), timestamp: 20.0)
+        engine.handleDecodedInput(.rotaryStep(.knob, .cw), timestamp: 20.015)
+
+        let lastHUD = hudEvents.last
+        #expect(lastHUD?.hitZeroDbLock == true)
+        #expect(lastHUD?.badgeText == "-12 dB MAX")
+        #expect(lastHUD?.dbText == "-12.0 dB")
+        let expectedLimitPos = RMEFaderCurve.dbToNormalized(-12.0)
+        #expect(abs((lastHUD?.safetyLimitNormalizedPosition ?? -1) - expectedLimitPos) < 1e-6)
+
+        engine.stop()
+    }
 }

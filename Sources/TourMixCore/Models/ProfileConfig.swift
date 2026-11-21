@@ -6,18 +6,159 @@ public enum RotaryBindingAction: Codable, Equatable, Sendable {
     case rmeOutputFader(
         channelIndex: Int,
         ballistics: RotaryBallisticsConfig,
-        safetyClamp0dB: Bool
+        safetyClamp0dB: Bool,
+        safetyMaxDb: Double = VolumeSafetyLimit.defaultMaxDb
     )
     case rmeSubmixFader(
         sourceBus: MixerBus,
         sourceIndex: Int,
         outputIndex: Int,
         ballistics: RotaryBallisticsConfig,
-        safetyClamp0dB: Bool
+        safetyClamp0dB: Bool,
+        safetyMaxDb: Double = VolumeSafetyLimit.defaultMaxDb
     )
     case keyPair(cw: KeyCombo, ccw: KeyCombo)
     case mouseScroll(MouseScrollConfig)
     case systemVolume
+
+    private enum OuterCodingKeys: String, CodingKey {
+        case none
+        case rmeOutputFader
+        case rmeSubmixFader
+        case keyPair
+        case mouseScroll
+        case systemVolume
+    }
+
+    private enum OutputFaderKeys: String, CodingKey {
+        case channelIndex
+        case ballistics
+        case safetyClamp0dB
+        case safetyMaxDb
+    }
+
+    private enum SubmixFaderKeys: String, CodingKey {
+        case sourceBus
+        case sourceIndex
+        case outputIndex
+        case ballistics
+        case safetyClamp0dB
+        case safetyMaxDb
+    }
+
+    private enum KeyPairKeys: String, CodingKey {
+        case cw
+        case ccw
+    }
+
+    private enum MouseScrollKeys: String, CodingKey {
+        case _0
+    }
+
+    private enum EmptyKeys: String, CodingKey {
+        case unused
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: OuterCodingKeys.self)
+        guard let matchedKey = container.allKeys.first else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "RotaryBindingAction 缺少动作类型键"
+                )
+            )
+        }
+
+        switch matchedKey {
+        case .none:
+            _ = try? container.nestedContainer(keyedBy: EmptyKeys.self, forKey: .none)
+            self = .none
+
+        case .rmeOutputFader:
+            let nested = try container.nestedContainer(keyedBy: OutputFaderKeys.self, forKey: .rmeOutputFader)
+            let channelIndex = try nested.decode(Int.self, forKey: .channelIndex)
+            let ballistics = try nested.decode(RotaryBallisticsConfig.self, forKey: .ballistics)
+            let safetyClamp = try nested.decode(Bool.self, forKey: .safetyClamp0dB)
+            let rawMaxDb = try nested.decodeIfPresent(Double.self, forKey: .safetyMaxDb)
+            let safetyMaxDb = VolumeSafetyLimit.clampCeilingDb(rawMaxDb ?? VolumeSafetyLimit.defaultMaxDb)
+            self = .rmeOutputFader(
+                channelIndex: channelIndex,
+                ballistics: ballistics,
+                safetyClamp0dB: safetyClamp,
+                safetyMaxDb: safetyMaxDb
+            )
+
+        case .rmeSubmixFader:
+            let nested = try container.nestedContainer(keyedBy: SubmixFaderKeys.self, forKey: .rmeSubmixFader)
+            let sourceBus = try nested.decode(MixerBus.self, forKey: .sourceBus)
+            let sourceIndex = try nested.decode(Int.self, forKey: .sourceIndex)
+            let outputIndex = try nested.decode(Int.self, forKey: .outputIndex)
+            let ballistics = try nested.decode(RotaryBallisticsConfig.self, forKey: .ballistics)
+            let safetyClamp = try nested.decode(Bool.self, forKey: .safetyClamp0dB)
+            let rawMaxDb = try nested.decodeIfPresent(Double.self, forKey: .safetyMaxDb)
+            let safetyMaxDb = VolumeSafetyLimit.clampCeilingDb(rawMaxDb ?? VolumeSafetyLimit.defaultMaxDb)
+            self = .rmeSubmixFader(
+                sourceBus: sourceBus,
+                sourceIndex: sourceIndex,
+                outputIndex: outputIndex,
+                ballistics: ballistics,
+                safetyClamp0dB: safetyClamp,
+                safetyMaxDb: safetyMaxDb
+            )
+
+        case .keyPair:
+            let nested = try container.nestedContainer(keyedBy: KeyPairKeys.self, forKey: .keyPair)
+            let cw = try nested.decode(KeyCombo.self, forKey: .cw)
+            let ccw = try nested.decode(KeyCombo.self, forKey: .ccw)
+            self = .keyPair(cw: cw, ccw: ccw)
+
+        case .mouseScroll:
+            let nested = try container.nestedContainer(keyedBy: MouseScrollKeys.self, forKey: .mouseScroll)
+            let cfg = try nested.decode(MouseScrollConfig.self, forKey: ._0)
+            self = .mouseScroll(cfg)
+
+        case .systemVolume:
+            _ = try? container.nestedContainer(keyedBy: EmptyKeys.self, forKey: .systemVolume)
+            self = .systemVolume
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: OuterCodingKeys.self)
+        switch self {
+        case .none:
+            _ = container.nestedContainer(keyedBy: EmptyKeys.self, forKey: .none)
+
+        case .rmeOutputFader(let channelIndex, let ballistics, let safetyClamp, let safetyMaxDb):
+            var nested = container.nestedContainer(keyedBy: OutputFaderKeys.self, forKey: .rmeOutputFader)
+            try nested.encode(channelIndex, forKey: .channelIndex)
+            try nested.encode(ballistics, forKey: .ballistics)
+            try nested.encode(safetyClamp, forKey: .safetyClamp0dB)
+            try nested.encode(VolumeSafetyLimit.clampCeilingDb(safetyMaxDb), forKey: .safetyMaxDb)
+
+        case .rmeSubmixFader(let sourceBus, let sourceIndex, let outputIndex, let ballistics, let safetyClamp, let safetyMaxDb):
+            var nested = container.nestedContainer(keyedBy: SubmixFaderKeys.self, forKey: .rmeSubmixFader)
+            try nested.encode(sourceBus, forKey: .sourceBus)
+            try nested.encode(sourceIndex, forKey: .sourceIndex)
+            try nested.encode(outputIndex, forKey: .outputIndex)
+            try nested.encode(ballistics, forKey: .ballistics)
+            try nested.encode(safetyClamp, forKey: .safetyClamp0dB)
+            try nested.encode(VolumeSafetyLimit.clampCeilingDb(safetyMaxDb), forKey: .safetyMaxDb)
+
+        case .keyPair(let cw, let ccw):
+            var nested = container.nestedContainer(keyedBy: KeyPairKeys.self, forKey: .keyPair)
+            try nested.encode(cw, forKey: .cw)
+            try nested.encode(ccw, forKey: .ccw)
+
+        case .mouseScroll(let cfg):
+            var nested = container.nestedContainer(keyedBy: MouseScrollKeys.self, forKey: .mouseScroll)
+            try nested.encode(cfg, forKey: ._0)
+
+        case .systemVolume:
+            _ = container.nestedContainer(keyedBy: EmptyKeys.self, forKey: .systemVolume)
+        }
+    }
 
     public var isNone: Bool {
         if case .none = self { return true }
@@ -38,9 +179,9 @@ public enum RotaryBindingAction: Codable, Equatable, Sendable {
         switch self {
         case .none:
             return nil
-        case .rmeOutputFader(let channelIndex, _, _):
+        case .rmeOutputFader(let channelIndex, _, _, _):
             return "\(channelNameResolver(.output, channelIndex)) 音量"
-        case .rmeSubmixFader(let sourceBus, let sourceIndex, let outputIndex, _, _):
+        case .rmeSubmixFader(let sourceBus, let sourceIndex, let outputIndex, _, _, _):
             let src = channelNameResolver(sourceBus, sourceIndex)
             let dst = channelNameResolver(.output, outputIndex)
             return "\(src) → \(dst)"
@@ -201,26 +342,35 @@ public struct ProfileConfig: Codable, Equatable, Identifiable, Sendable {
     }
 
     /// 按确定性顺序提取当前预设绑定的去重硬件输出通道列表（供菜单栏面板自适应渲染 `1..N` 张通道卡片）。
-    public var boundOutputChannels: [(channelIndex: Int, safetyClamp0dB: Bool)] {
-        var result: [(channelIndex: Int, safetyClamp0dB: Bool)] = []
+    public var boundOutputChannels: [(channelIndex: Int, safetyClamp0dB: Bool, safetyMaxDb: Double)] {
+        var result: [(channelIndex: Int, safetyClamp0dB: Bool, safetyMaxDb: Double)] = []
         var indexPositionMap: [Int: Int] = [:]
 
-        func upsert(channel: Int, safetyClamp: Bool, overwriteClamp: Bool) {
+        func upsert(channel: Int, safetyClamp: Bool, safetyMaxDb: Double, overwriteClamp: Bool) {
             guard channel >= 0 else { return }
+            let clampedLimit = VolumeSafetyLimit.clampCeilingDb(safetyMaxDb)
             if let existingPos = indexPositionMap[channel] {
                 if overwriteClamp {
-                    result[existingPos] = (channelIndex: channel, safetyClamp0dB: safetyClamp)
+                    result[existingPos] = (
+                        channelIndex: channel,
+                        safetyClamp0dB: safetyClamp,
+                        safetyMaxDb: clampedLimit
+                    )
                 }
             } else {
                 indexPositionMap[channel] = result.count
-                result.append((channelIndex: channel, safetyClamp0dB: safetyClamp))
+                result.append((
+                    channelIndex: channel,
+                    safetyClamp0dB: safetyClamp,
+                    safetyMaxDb: clampedLimit
+                ))
             }
         }
 
         // 1. 基础层旋钮（按 Knob -> Scroll 顺序）
         for rotary in TourBoxRotary.allCases {
-            if case .rmeOutputFader(let ch, _, let clamp) = rotaryBindings[rotary] {
-                upsert(channel: ch, safetyClamp: clamp, overwriteClamp: true)
+            if case .rmeOutputFader(let ch, _, let clamp, let maxDb) = rotaryBindings[rotary] {
+                upsert(channel: ch, safetyClamp: clamp, safetyMaxDb: maxDb, overwriteClamp: true)
             }
         }
 
@@ -228,8 +378,8 @@ public struct ProfileConfig: Codable, Equatable, Identifiable, Sendable {
         for mod in TourBoxButton.allCases {
             for rotary in TourBoxRotary.allCases {
                 let key = ControlStateMachine.RotaryComboKey(modifier: mod, rotary: rotary)
-                if case .rmeOutputFader(let ch, _, let clamp) = rotaryComboBindings[key] {
-                    upsert(channel: ch, safetyClamp: clamp, overwriteClamp: false)
+                if case .rmeOutputFader(let ch, _, let clamp, let maxDb) = rotaryComboBindings[key] {
+                    upsert(channel: ch, safetyClamp: clamp, safetyMaxDb: maxDb, overwriteClamp: false)
                 }
             }
         }
@@ -238,12 +388,22 @@ public struct ProfileConfig: Codable, Equatable, Identifiable, Sendable {
         for button in TourBoxButton.allCases {
             if let action = buttonBindings[button] {
                 extractOutputChannel(from: action) { ch in
-                    upsert(channel: ch, safetyClamp: true, overwriteClamp: false)
+                    upsert(
+                        channel: ch,
+                        safetyClamp: true,
+                        safetyMaxDb: VolumeSafetyLimit.defaultMaxDb,
+                        overwriteClamp: false
+                    )
                 }
             }
             if let action = doublePressBindings[button] {
                 extractOutputChannel(from: action) { ch in
-                    upsert(channel: ch, safetyClamp: true, overwriteClamp: false)
+                    upsert(
+                        channel: ch,
+                        safetyClamp: true,
+                        safetyMaxDb: VolumeSafetyLimit.defaultMaxDb,
+                        overwriteClamp: false
+                    )
                 }
             }
         }
@@ -253,7 +413,12 @@ public struct ProfileConfig: Codable, Equatable, Identifiable, Sendable {
                 let key = ControlStateMachine.ButtonComboKey(modifier: mod, targetButton: btn)
                 if let action = buttonComboBindings[key] {
                     extractOutputChannel(from: action) { ch in
-                        upsert(channel: ch, safetyClamp: true, overwriteClamp: false)
+                        upsert(
+                            channel: ch,
+                            safetyClamp: true,
+                            safetyMaxDb: VolumeSafetyLimit.defaultMaxDb,
+                            overwriteClamp: false
+                        )
                     }
                 }
             }

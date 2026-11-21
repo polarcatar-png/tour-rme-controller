@@ -111,6 +111,52 @@ final class RotaryBallisticsTests: XCTestCase {
         XCTAssertFalse(disabledClamp.hitZeroDbLock)
     }
 
+    func testConfigurableSafetyCeilingClampAndFormatting() {
+        // Custom ceiling at -12.0 dB: upward crossing clamps to -12.0 dB with hitLimitLock = true
+        let clampedNeg12 = applySafetyCeilingClamp(currentDb: -13.0, deltaDb: 2.5, enabled: true, maxDb: -12.0)
+        XCTAssertEqual(clampedNeg12.targetDb, -12.0, accuracy: 1e-9)
+        XCTAssertTrue(clampedNeg12.hitLimitLock)
+
+        // Turning CW while already sitting at -12.0 dB stays locked
+        let heldAtNeg12 = applySafetyCeilingClamp(currentDb: -12.0, deltaDb: 0.5, enabled: true, maxDb: -12.0)
+        XCTAssertEqual(heldAtNeg12.targetDb, -12.0, accuracy: 1e-9)
+        XCTAssertTrue(heldAtNeg12.hitLimitLock)
+
+        // Exact landing on -6.0 dB without overshoot -> hitLimitLock = false
+        let exactNeg6 = applySafetyCeilingClamp(currentDb: -7.0, deltaDb: 1.0, enabled: true, maxDb: -6.0)
+        XCTAssertEqual(exactNeg6.targetDb, -6.0, accuracy: 1e-9)
+        XCTAssertFalse(exactNeg6.hitLimitLock)
+
+        // Turning CCW when currently above custom ceiling (-3.0 > -12.0) decreases normally
+        let stepDownAboveCap = applySafetyCeilingClamp(currentDb: -3.0, deltaDb: -1.0, enabled: true, maxDb: -12.0)
+        XCTAssertEqual(stepDownAboveCap.targetDb, -4.0, accuracy: 1e-9)
+        XCTAssertFalse(stepDownAboveCap.hitLimitLock)
+
+        // Custom ceiling above 0 dB (+3.0 dB) allows crossing 0 dB and clamps at +3.0 dB
+        let clampedPos3 = applySafetyCeilingClamp(currentDb: 2.0, deltaDb: 2.5, enabled: true, maxDb: 3.0)
+        XCTAssertEqual(clampedPos3.targetDb, 3.0, accuracy: 1e-9)
+        XCTAssertTrue(clampedPos3.hitLimitLock)
+
+        // Out-of-range ceiling inputs safely clamp into [-60.0, +6.0]
+        XCTAssertEqual(VolumeSafetyLimit.clampCeilingDb(-999.0), -60.0, accuracy: 1e-9)
+        XCTAssertEqual(VolumeSafetyLimit.clampCeilingDb(50.0), 6.0, accuracy: 1e-9)
+        XCTAssertEqual(VolumeSafetyLimit.clampCeilingDb(-0.0), 0.0, accuracy: 1e-9)
+        XCTAssertEqual(VolumeSafetyLimit.clampCeilingDb(.nan), 0.0, accuracy: 1e-9)
+
+        // Disabled custom ceiling ignores -18.5 dB limit
+        let disabledCustom = applySafetyCeilingClamp(currentDb: -20.0, deltaDb: 5.0, enabled: false, maxDb: -18.5)
+        XCTAssertEqual(disabledCustom.targetDb, -15.0, accuracy: 1e-9)
+        XCTAssertFalse(disabledCustom.hitLimitLock)
+
+        // Concise formatting & badge generation
+        XCTAssertEqual(VolumeSafetyLimit.formatLimitDb(0.0), "0 dB")
+        XCTAssertEqual(VolumeSafetyLimit.formatMaxBadge(0.0), "0 dB MAX")
+        XCTAssertEqual(VolumeSafetyLimit.formatLimitDb(-12.0), "-12 dB")
+        XCTAssertEqual(VolumeSafetyLimit.formatMaxBadge(-12.0), "-12 dB MAX")
+        XCTAssertEqual(VolumeSafetyLimit.formatLimitDb(-12.5), "-12.5 dB")
+        XCTAssertEqual(VolumeSafetyLimit.formatLimitDb(3.0), "+3 dB")
+    }
+
     func testConfigCodableRoundTrip() throws {
         let configs: [RotaryBallisticsConfig] = [
             .standard,

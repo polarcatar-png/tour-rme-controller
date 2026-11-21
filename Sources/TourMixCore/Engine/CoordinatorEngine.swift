@@ -9,6 +9,7 @@ public struct CoordinatorHUDEvent: Equatable, Sendable {
     public let dbText: String
     public let normalizedLevel: Double
     public let unityNormalizedPosition: Double
+    public let safetyLimitNormalizedPosition: Double?
     public let isMuted: Bool
     public let hitZeroDbLock: Bool
     public let badgeText: String?
@@ -20,6 +21,7 @@ public struct CoordinatorHUDEvent: Equatable, Sendable {
         dbText: String,
         normalizedLevel: Double,
         unityNormalizedPosition: Double = RMEFaderCurve.zeroDbNormalized,
+        safetyLimitNormalizedPosition: Double? = nil,
         isMuted: Bool = false,
         hitZeroDbLock: Bool = false,
         badgeText: String? = nil,
@@ -30,6 +32,7 @@ public struct CoordinatorHUDEvent: Equatable, Sendable {
         self.dbText = dbText
         self.normalizedLevel = normalizedLevel
         self.unityNormalizedPosition = unityNormalizedPosition
+        self.safetyLimitNormalizedPosition = safetyLimitNormalizedPosition
         self.isMuted = isMuted
         self.hitZeroDbLock = hitZeroDbLock
         self.badgeText = badgeText
@@ -110,11 +113,12 @@ public final class CoordinatorEngine {
     }
 
     /// 当前预设已绑定的去重输出通道列表（供菜单栏面板自适应渲染 `1..N` 张通道卡片）。
-    public var boundOutputChannels: [(channelIndex: Int, safetyClamp0dB: Bool)] {
+    public var boundOutputChannels: [(channelIndex: Int, safetyClamp0dB: Bool, safetyMaxDb: Double)] {
         activeProfile.boundOutputChannels.map { item in
             (
                 channelIndex: totalMix.canonicalOutputIndex(item.channelIndex),
-                safetyClamp0dB: item.safetyClamp0dB
+                safetyClamp0dB: item.safetyClamp0dB,
+                safetyMaxDb: item.safetyMaxDb
             )
         }.reduce(into: []) { acc, entry in
             if !acc.contains(where: { $0.channelIndex == entry.channelIndex }) {
@@ -355,12 +359,15 @@ public final class CoordinatorEngine {
 
     /// 菜单栏面板水平推子直调指定硬件输出通道音量。
     public func setOutputChannelFaderNormalized(channelIndex: Int, normalized: Double) {
-        let clamp = boundOutputChannels.first(where: { $0.channelIndex == totalMix.canonicalOutputIndex(channelIndex) })?
-            .safetyClamp0dB ?? false
+        let canonical = totalMix.canonicalOutputIndex(channelIndex)
+        let channelConfig = boundOutputChannels.first(where: { $0.channelIndex == canonical })
+        let clamp = channelConfig?.safetyClamp0dB ?? false
+        let maxDb = channelConfig?.safetyMaxDb ?? VolumeSafetyLimit.defaultMaxDb
         _ = totalMix.setOutputFaderNormalized(
             channel: channelIndex,
             normalized: normalized,
-            safetyClamp0dB: clamp
+            safetyClamp0dB: clamp,
+            safetyMaxDb: maxDb
         )
     }
 
@@ -369,6 +376,11 @@ public final class CoordinatorEngine {
     public func toggleOutputChannelMute(channelIndex: Int) -> Bool {
         let muted = totalMix.toggleOutputMute(channel: channelIndex)
         if let ch = totalMix.outputChannel(at: channelIndex) {
+            let canonical = totalMix.canonicalOutputIndex(channelIndex)
+            let channelConfig = boundOutputChannels.first(where: { $0.channelIndex == canonical })
+            let limitNorm: Double? = (channelConfig?.safetyClamp0dB == true)
+                ? RMEFaderCurve.dbToNormalized(VolumeSafetyLimit.clampCeilingDb(channelConfig?.safetyMaxDb ?? 0.0))
+                : nil
             emitHUDIfEnabled(
                 CoordinatorHUDEvent(
                     title: ch.displayName,
@@ -376,6 +388,7 @@ public final class CoordinatorEngine {
                     dbText: muted ? "MUTED" : ch.formattedDb,
                     normalizedLevel: ch.normalizedFader,
                     unityNormalizedPosition: RMEFaderCurve.zeroDbNormalized,
+                    safetyLimitNormalizedPosition: limitNorm,
                     isMuted: muted,
                     hitZeroDbLock: false,
                     badgeText: muted ? "MUTE" : nil,
@@ -386,29 +399,63 @@ public final class CoordinatorEngine {
         return muted
     }
 
-    /// 菜单栏卡片一键切换某输出通道在当前预设中的 `0.0 dB` 过载保护锁。
+    /// 菜单栏卡片一键切换某输出通道在当前预设中的音量保护开关（保留原自定义上限）。
     public func setOutputChannelSafetyClamp(channelIndex: Int, enabled: Bool) {
         let targetCanonical = totalMix.canonicalOutputIndex(channelIndex)
         mutateActiveProfile { profile in
             for rotary in TourBoxRotary.allCases {
-                if case .rmeOutputFader(let ch, let ballistics, _) = profile.rotaryBindings[rotary],
+                if case .rmeOutputFader(let ch, let ballistics, _, let maxDb) = profile.rotaryBindings[rotary],
                    totalMix.canonicalOutputIndex(ch) == targetCanonical
                 {
                     profile.rotaryBindings[rotary] = .rmeOutputFader(
                         channelIndex: targetCanonical,
                         ballistics: ballistics,
-                        safetyClamp0dB: enabled
+                        safetyClamp0dB: enabled,
+                        safetyMaxDb: maxDb
                     )
                 }
             }
             for (comboKey, action) in profile.rotaryComboBindings {
-                if case .rmeOutputFader(let ch, let ballistics, _) = action,
+                if case .rmeOutputFader(let ch, let ballistics, _, let maxDb) = action,
                    totalMix.canonicalOutputIndex(ch) == targetCanonical
                 {
                     profile.rotaryComboBindings[comboKey] = .rmeOutputFader(
                         channelIndex: targetCanonical,
                         ballistics: ballistics,
-                        safetyClamp0dB: enabled
+                        safetyClamp0dB: enabled,
+                        safetyMaxDb: maxDb
+                    )
+                }
+            }
+        }
+    }
+
+    /// 更新指定输出通道在当前预设中的音量保护开关与自定义上限 dB。
+    public func setOutputChannelSafetyLimit(channelIndex: Int, enabled: Bool, maxDb: Double) {
+        let targetCanonical = totalMix.canonicalOutputIndex(channelIndex)
+        let clampedLimit = VolumeSafetyLimit.clampCeilingDb(maxDb)
+        mutateActiveProfile { profile in
+            for rotary in TourBoxRotary.allCases {
+                if case .rmeOutputFader(let ch, let ballistics, _, _) = profile.rotaryBindings[rotary],
+                   totalMix.canonicalOutputIndex(ch) == targetCanonical
+                {
+                    profile.rotaryBindings[rotary] = .rmeOutputFader(
+                        channelIndex: targetCanonical,
+                        ballistics: ballistics,
+                        safetyClamp0dB: enabled,
+                        safetyMaxDb: clampedLimit
+                    )
+                }
+            }
+            for (comboKey, action) in profile.rotaryComboBindings {
+                if case .rmeOutputFader(let ch, let ballistics, _, _) = action,
+                   totalMix.canonicalOutputIndex(ch) == targetCanonical
+                {
+                    profile.rotaryComboBindings[comboKey] = .rmeOutputFader(
+                        channelIndex: targetCanonical,
+                        ballistics: ballistics,
+                        safetyClamp0dB: enabled,
+                        safetyMaxDb: clampedLimit
                     )
                 }
             }
@@ -675,7 +722,7 @@ public final class CoordinatorEngine {
         case .none:
             return
 
-        case .rmeOutputFader(let channelIndex, let ballistics, let safetyClamp0dB):
+        case .rmeOutputFader(let channelIndex, let ballistics, let safetyClamp0dB, let safetyMaxDb):
             var state = ballisticsBySlot[slotKey, default: RotaryBallisticsState()]
             let deltaDb = state.step(
                 isClockwise: direction.isClockwise,
@@ -684,14 +731,17 @@ public final class CoordinatorEngine {
             )
             ballisticsBySlot[slotKey] = state
 
+            let limitDb = VolumeSafetyLimit.clampCeilingDb(safetyMaxDb)
             let stepResult = totalMix.adjustOutputFaderDb(
                 channel: channelIndex,
                 deltaDb: deltaDb,
-                safetyClamp0dB: safetyClamp0dB
+                safetyClamp0dB: safetyClamp0dB,
+                safetyMaxDb: limitDb
             )
 
             guard !stepResult.isDeferredColdStart else { return }
 
+            let limitNorm: Double? = safetyClamp0dB ? RMEFaderCurve.dbToNormalized(limitDb) : nil
             emitHUDIfEnabled(
                 CoordinatorHUDEvent(
                     title: stepResult.displayName,
@@ -699,14 +749,15 @@ public final class CoordinatorEngine {
                     dbText: stepResult.isMuted ? "MUTED" : stepResult.formattedDb,
                     normalizedLevel: stepResult.normalizedFader,
                     unityNormalizedPosition: RMEFaderCurve.zeroDbNormalized,
+                    safetyLimitNormalizedPosition: limitNorm,
                     isMuted: stepResult.isMuted,
                     hitZeroDbLock: stepResult.hitZeroDbLock,
-                    badgeText: stepResult.hitZeroDbLock ? "0 dB MAX" : nil,
+                    badgeText: stepResult.hitZeroDbLock ? VolumeSafetyLimit.formatMaxBadge(limitDb) : nil,
                     systemIcon: stepResult.isMuted ? "speaker.slash.fill" : "hifispeaker.2.fill"
                 )
             )
 
-        case .rmeSubmixFader(let sourceBus, let sourceIndex, let outputIndex, let ballistics, let safetyClamp0dB):
+        case .rmeSubmixFader(let sourceBus, let sourceIndex, let outputIndex, let ballistics, let safetyClamp0dB, let safetyMaxDb):
             var state = ballisticsBySlot[slotKey, default: RotaryBallisticsState()]
             let deltaDb = state.step(
                 isClockwise: direction.isClockwise,
@@ -726,10 +777,12 @@ public final class CoordinatorEngine {
                 outputIndex: canonicalOut
             )
             let currentDb = totalMix.submixRoutes[routeKey]?.dbValue ?? 0.0
-            let clamped = applyZeroDbSafetyClamp(
+            let limitDb = VolumeSafetyLimit.clampCeilingDb(safetyMaxDb)
+            let clamped = applySafetyCeilingClamp(
                 currentDb: currentDb,
                 deltaDb: deltaDb,
-                enabled: safetyClamp0dB
+                enabled: safetyClamp0dB,
+                maxDb: limitDb
             )
             let targetDb = min(RMEFaderCurve.maxDb, max(RMEFaderCurve.minDb, clamped.targetDb))
             let targetNorm = RMEFaderCurve.dbToNormalized(targetDb)
@@ -742,6 +795,7 @@ public final class CoordinatorEngine {
 
             let srcName = channelDisplayName(bus: sourceBus, index: canonicalSrc)
             let dstName = channelDisplayName(bus: .output, index: canonicalOut)
+            let limitNorm: Double? = safetyClamp0dB ? RMEFaderCurve.dbToNormalized(limitDb) : nil
             emitHUDIfEnabled(
                 CoordinatorHUDEvent(
                     title: "\(srcName) → \(dstName)",
@@ -749,9 +803,10 @@ public final class CoordinatorEngine {
                     dbText: RMEFaderCurve.formatDb(targetDb),
                     normalizedLevel: targetNorm,
                     unityNormalizedPosition: RMEFaderCurve.zeroDbNormalized,
+                    safetyLimitNormalizedPosition: limitNorm,
                     isMuted: false,
-                    hitZeroDbLock: clamped.hitZeroDbLock,
-                    badgeText: clamped.hitZeroDbLock ? "0 dB MAX" : nil,
+                    hitZeroDbLock: clamped.hitLimitLock,
+                    badgeText: clamped.hitLimitLock ? VolumeSafetyLimit.formatMaxBadge(limitDb) : nil,
                     systemIcon: "slider.vertical.3"
                 )
             )

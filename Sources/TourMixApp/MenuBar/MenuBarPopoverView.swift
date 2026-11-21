@@ -44,22 +44,14 @@ public struct MenuBarPopoverView: View {
             }
 
             Divider()
-                .overlay(Color.white.opacity(0.08))
+                .overlay(TotalMixTheme.borderSubtle)
 
             footerBar
         }
         .padding(12)
         .frame(width: 336)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.11, green: 0.12, blue: 0.14),
-                    Color(red: 0.08, green: 0.09, blue: 0.11),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .background(TotalMixTheme.windowGradient)
+        .tint(TotalMixTheme.accent)
         .preferredColorScheme(.dark)
     }
 
@@ -87,7 +79,7 @@ public struct MenuBarPopoverView: View {
 
             Text(tourBoxShortStatus)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.9))
+                .foregroundStyle(TotalMixTheme.textPrimary)
                 .lineLimit(1)
 
             if case .portBusy = engine.tourBoxState {
@@ -96,15 +88,22 @@ public struct MenuBarPopoverView: View {
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(TotalMixTheme.rmeAmber)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1)
-                .background(Color.orange.opacity(0.16), in: Capsule())
+                .background(TotalMixTheme.rmeAmber.opacity(0.18), in: Capsule())
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color.white.opacity(0.06), in: Capsule())
+        .background(
+            Capsule()
+                .fill(TotalMixTheme.stripSurfaceTop)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.75)
+                )
+        )
         .help(engine.tourBoxState.displayText)
     }
 
@@ -122,12 +121,19 @@ public struct MenuBarPopoverView: View {
 
                 Text(totalMixShortStatus)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.9))
+                    .foregroundStyle(TotalMixTheme.textPrimary)
                     .lineLimit(1)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.white.opacity(0.06), in: Capsule())
+            .background(
+                Capsule()
+                    .fill(TotalMixTheme.stripSurfaceTop)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.75)
+                    )
+            )
         }
         .buttonStyle(.plain)
         .help(
@@ -159,18 +165,27 @@ public struct MenuBarPopoverView: View {
             HStack(spacing: 4) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(TotalMixTheme.accent)
                 Text(engine.activeProfile.name)
                     .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(TotalMixTheme.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(TotalMixTheme.textSecondary)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .frame(maxWidth: 122)
-            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(TotalMixTheme.stripSurfaceTop)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.75)
+                    )
+            )
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -183,11 +198,11 @@ public struct MenuBarPopoverView: View {
             HStack(spacing: 6) {
                 Image(systemName: isPortConflict ? "exclamationmark.triangle.fill" : "antenna.radiowaves.left.and.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(isPortConflict ? .red : .orange)
+                    .foregroundStyle(isPortConflict ? TotalMixTheme.rmeRed : TotalMixTheme.rmeAmber)
 
                 Text(isPortConflict ? "OSC 本地监听端口冲突" : "等待连接 TotalMix FX Global OSC")
                     .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(TotalMixTheme.textPrimary)
 
                 Spacer()
 
@@ -196,7 +211,7 @@ public struct MenuBarPopoverView: View {
                 } label: {
                     Image(systemName: isSetupGuideExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -205,7 +220,7 @@ public struct MenuBarPopoverView: View {
                 if case .portInUse(_, let message) = engine.totalMix.transportState {
                     Text(message)
                         .font(.system(size: 10.5))
-                        .foregroundStyle(.red.opacity(0.95))
+                        .foregroundStyle(TotalMixTheme.rmeRed)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     VStack(alignment: .leading, spacing: 3) {
@@ -214,12 +229,12 @@ public struct MenuBarPopoverView: View {
                         Text("3. Compatibility 选择 Global OSC（开启后无需重启自动秒连）")
                     }
                     .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(TotalMixTheme.textSecondary)
 
                     if let diag = engine.totalMix.offlineDiagnostic, !diag.issues.isEmpty {
                         Text(diag.offlineHintSummary)
                             .font(.system(size: 10))
-                            .foregroundStyle(.orange.opacity(0.9))
+                            .foregroundStyle(TotalMixTheme.rmeAmber)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 2)
                     }
@@ -231,16 +246,17 @@ public struct MenuBarPopoverView: View {
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(TotalMixTheme.textPrimary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 5))
+                    .background(TotalMixTheme.surfaceControl, in: RoundedRectangle(cornerRadius: 5))
 
                     Button("查看连接诊断…") {
                         onOpenDiagnostics()
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(Color.cyan)
+                    .foregroundStyle(TotalMixTheme.accent)
 
                     Spacer()
                 }
@@ -250,11 +266,11 @@ public struct MenuBarPopoverView: View {
         .padding(9)
         .background(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(isPortConflict ? Color.red.opacity(0.12) : Color.orange.opacity(0.10))
+                .fill(TotalMixTheme.stripSurfaceBottom)
                 .overlay(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .strokeBorder(
-                            isPortConflict ? Color.red.opacity(0.35) : Color.orange.opacity(0.28),
+                            isPortConflict ? TotalMixTheme.rmeRed.opacity(0.65) : TotalMixTheme.rmeAmber.opacity(0.50),
                             lineWidth: 1
                         )
                 )
@@ -274,7 +290,8 @@ public struct MenuBarPopoverView: View {
                 PrimaryOutputMonitorCard(
                     engine: engine,
                     channelIndex: single.channelIndex,
-                    safetyClamp0dB: single.safetyClamp0dB
+                    safetyClamp0dB: single.safetyClamp0dB,
+                    safetyMaxDb: single.safetyMaxDb
                 )
 
                 Button {
@@ -289,10 +306,17 @@ public struct MenuBarPopoverView: View {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
                     }
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(TotalMixTheme.textSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 7))
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(TotalMixTheme.stripSurfaceBottom)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 7)
+                                    .strokeBorder(TotalMixTheme.borderSubtle.opacity(0.7), lineWidth: 0.7)
+                            )
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -302,7 +326,8 @@ public struct MenuBarPopoverView: View {
                     CompactOutputMonitorCard(
                         engine: engine,
                         channelIndex: item.channelIndex,
-                        safetyClamp0dB: item.safetyClamp0dB
+                        safetyClamp0dB: item.safetyClamp0dB,
+                        safetyMaxDb: item.safetyMaxDb
                     )
                 }
             }
@@ -313,7 +338,8 @@ public struct MenuBarPopoverView: View {
                         CompactOutputMonitorCard(
                             engine: engine,
                             channelIndex: item.channelIndex,
-                            safetyClamp0dB: item.safetyClamp0dB
+                            safetyClamp0dB: item.safetyClamp0dB,
+                            safetyMaxDb: item.safetyMaxDb
                         )
                     }
                 }
@@ -327,10 +353,10 @@ public struct MenuBarPopoverView: View {
         VStack(spacing: 8) {
             Image(systemName: "dial.medium")
                 .font(.system(size: 22))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(TotalMixTheme.textSecondary)
             Text("当前预设未绑定 RME 输出推子")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(TotalMixTheme.textSecondary)
             Button("打开按键映射工作台配置…") {
                 onOpenKeymapper()
             }
@@ -339,7 +365,14 @@ public struct MenuBarPopoverView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(TotalMixTheme.stripCardGradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.8)
+                )
+        )
     }
 
     // MARK: - 4. Control Room Quick Strip
@@ -349,11 +382,11 @@ public struct MenuBarPopoverView: View {
             HStack {
                 Text("监听室快捷栏")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(TotalMixTheme.textSecondary)
                 Spacer()
                 Text("Main: \(engine.totalMix.mainOutDisplayName)")
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary.opacity(0.85))
+                    .foregroundStyle(TotalMixTheme.textMuted)
             }
 
             HStack(spacing: 6) {
@@ -361,7 +394,8 @@ public struct MenuBarPopoverView: View {
                     title: "TotalMix",
                     icon: "macwindow",
                     isActive: false,
-                    activeColor: .blue
+                    activeColor: TotalMixTheme.accentDeep,
+                    inactiveIconColor: TotalMixTheme.accent
                 ) {
                     _ = engine.totalMix.toggleTotalMixWindow()
                 }
@@ -370,7 +404,8 @@ public struct MenuBarPopoverView: View {
                     title: "DIM",
                     icon: "speaker.minus.fill",
                     isActive: engine.totalMix.controlRoom.dim,
-                    activeColor: .orange
+                    activeColor: TotalMixTheme.rmeAmber,
+                    activeTextColor: TotalMixTheme.chassisDeep
                 ) {
                     _ = engine.totalMix.toggleControlRoom(.dim)
                 }
@@ -379,7 +414,8 @@ public struct MenuBarPopoverView: View {
                     title: "MONO",
                     icon: "circle.grid.cross.fill",
                     isActive: engine.totalMix.controlRoom.mono,
-                    activeColor: .teal
+                    activeColor: TotalMixTheme.accentDeep,
+                    activeTextColor: TotalMixTheme.textPrimary
                 ) {
                     _ = engine.totalMix.toggleControlRoom(.mono)
                 }
@@ -388,14 +424,22 @@ public struct MenuBarPopoverView: View {
                     title: "SPK B",
                     icon: "hifispeaker.2.fill",
                     isActive: engine.totalMix.controlRoom.speakerB,
-                    activeColor: .cyan
+                    activeColor: TotalMixTheme.accent,
+                    activeTextColor: TotalMixTheme.chassisDeep
                 ) {
                     _ = engine.totalMix.toggleControlRoom(.speakerB)
                 }
             }
         }
         .padding(8)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(TotalMixTheme.stripSurfaceBottom)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.8)
+                )
+        )
     }
 
     private func controlRoomPill(
@@ -403,22 +447,29 @@ public struct MenuBarPopoverView: View {
         icon: String,
         isActive: Bool,
         activeColor: Color,
+        activeTextColor: Color = TotalMixTheme.chassisDeep,
+        inactiveIconColor: Color? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(isActive ? activeTextColor : (inactiveIconColor ?? TotalMixTheme.textPrimary))
                 Text(title)
                     .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(isActive ? activeTextColor : TotalMixTheme.textPrimary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 5)
-            .foregroundStyle(isActive ? Color.black : Color.primary.opacity(0.88))
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isActive ? activeColor : Color.white.opacity(0.07))
+                    .fill(isActive ? activeColor : TotalMixTheme.surfaceControl)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(isActive ? activeColor.opacity(0.9) : TotalMixTheme.borderSubtle, lineWidth: 0.7)
             )
         }
         .buttonStyle(.plain)
@@ -430,10 +481,10 @@ public struct MenuBarPopoverView: View {
         HStack(spacing: 6) {
             Image(systemName: "folder.badge.gearshape")
                 .font(.system(size: 11))
-                .foregroundStyle(.cyan)
+                .foregroundStyle(TotalMixTheme.accent)
             Text("当前未在 /Applications 运行，移入后自启更稳定")
                 .font(.system(size: 10))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(TotalMixTheme.textSecondary)
                 .lineLimit(1)
             Spacer(minLength: 4)
             Button("移入") {
@@ -441,14 +492,14 @@ public struct MenuBarPopoverView: View {
             }
             .buttonStyle(.plain)
             .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.cyan)
+            .foregroundStyle(TotalMixTheme.accent)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Color.cyan.opacity(0.15), in: Capsule())
+            .background(TotalMixTheme.accentDeep.opacity(0.28), in: Capsule())
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 7))
+        .background(TotalMixTheme.stripSurfaceBottom, in: RoundedRectangle(cornerRadius: 7))
     }
 
     private var footerBar: some View {
@@ -464,8 +515,15 @@ public struct MenuBarPopoverView: View {
                 }
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
-                .background(Color.cyan.opacity(0.18), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .foregroundStyle(Color.cyan)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(TotalMixTheme.accentDeep.opacity(0.32))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(TotalMixTheme.accent.opacity(0.55), lineWidth: 0.8)
+                        )
+                )
+                .foregroundStyle(TotalMixTheme.accentLight)
             }
             .buttonStyle(.plain)
 
@@ -477,9 +535,9 @@ public struct MenuBarPopoverView: View {
             } label: {
                 Image(systemName: engine.configuration.showHUD ? "rectangle.inset.bottomleading.filled" : "rectangle.slash")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(engine.configuration.showHUD ? Color.cyan : Color.secondary)
+                    .foregroundStyle(engine.configuration.showHUD ? TotalMixTheme.accent : TotalMixTheme.textSecondary)
                     .frame(width: 24, height: 24)
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
+                    .background(TotalMixTheme.surfaceControl, in: RoundedRectangle(cornerRadius: 5))
             }
             .buttonStyle(.plain)
             .help(engine.configuration.showHUD ? "屏幕音量 HUD：已开启" : "屏幕音量 HUD：已关闭")
@@ -490,9 +548,9 @@ public struct MenuBarPopoverView: View {
             } label: {
                 Image(systemName: launchManager.isEnabled ? "power.circle.fill" : "power.circle")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(launchManager.isEnabled ? Color.green : Color.secondary)
+                    .foregroundStyle(launchManager.isEnabled ? TotalMixTheme.rmeGreen : TotalMixTheme.textSecondary)
                     .frame(width: 24, height: 24)
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
+                    .background(TotalMixTheme.surfaceControl, in: RoundedRectangle(cornerRadius: 5))
             }
             .buttonStyle(.plain)
             .help(launchManager.isEnabled ? "开机自动启动：已开启" : "开机自动启动：已关闭")
@@ -502,10 +560,10 @@ public struct MenuBarPopoverView: View {
             } label: {
                 Text("退出")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(TotalMixTheme.textSecondary)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
+                    .background(TotalMixTheme.surfaceControl, in: RoundedRectangle(cornerRadius: 5))
             }
             .buttonStyle(.plain)
         }
@@ -516,13 +574,13 @@ public struct MenuBarPopoverView: View {
     private var tourBoxDotColor: Color {
         switch engine.tourBoxState {
         case .connected:
-            return .green
+            return TotalMixTheme.rmeGreen
         case .connecting, .portBusy:
-            return .orange
+            return TotalMixTheme.rmeAmber
         case .disconnected:
-            return .gray
+            return TotalMixTheme.textMuted
         case .error:
-            return .red
+            return TotalMixTheme.rmeRed
         }
     }
 
@@ -550,12 +608,12 @@ public struct MenuBarPopoverView: View {
 
     private var totalMixDotColor: Color {
         if engine.totalMix.isConnected {
-            return .green
+            return TotalMixTheme.rmeGreen
         }
         if isPortConflict {
-            return .red
+            return TotalMixTheme.rmeRed
         }
-        return .orange
+        return TotalMixTheme.rmeAmber
     }
 
     private var totalMixShortStatus: String {
@@ -576,6 +634,9 @@ private struct PrimaryOutputMonitorCard: View {
     let engine: CoordinatorEngine
     let channelIndex: Int
     let safetyClamp0dB: Bool
+    let safetyMaxDb: Double
+
+    @State private var isEditingSafetyLimit: Bool = false
 
     private var channelState: MixerChannelState {
         engine.totalMix.outputChannel(at: channelIndex) ?? MixerChannelState(
@@ -587,25 +648,32 @@ private struct PrimaryOutputMonitorCard: View {
 
     var body: some View {
         let ch = channelState
+        let effectiveMaxDb = VolumeSafetyLimit.clampCeilingDb(safetyMaxDb)
+        let isAtSafetyCeiling = safetyClamp0dB && ch.hasConfirmedValue && ch.dbValue >= effectiveMaxDb - 0.05
+
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                            .fill(ch.isMuted ? TotalMixTheme.rmeRed : TotalMixTheme.accent)
+                            .frame(width: 3, height: 15)
+
                         Text(ch.displayName)
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(TotalMixTheme.textPrimary)
 
                         Text(ch.isStereo ? "STEREO" : "MONO")
                             .font(.system(size: 9, weight: .bold))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1.5)
-                            .background(Color.white.opacity(0.10), in: Capsule())
-                            .foregroundStyle(.secondary)
+                            .background(TotalMixTheme.surfaceControl, in: Capsule())
+                            .foregroundStyle(TotalMixTheme.textSecondary)
                     }
 
                     Text("Hardware Output · Knob 主旋钮直控")
                         .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(TotalMixTheme.textSecondary)
                 }
 
                 Spacer()
@@ -613,13 +681,14 @@ private struct PrimaryOutputMonitorCard: View {
                 Text(readoutText(for: ch))
                     .font(.system(size: 21, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(ch.isMuted ? Color.cyan : Color.white)
+                    .foregroundStyle(readoutColor(for: ch, atCeiling: isAtSafetyCeiling))
             }
 
             RMEFaderBar(
                 normalizedValue: ch.normalizedFader,
                 isMuted: ch.isMuted,
                 safetyClamp0dB: safetyClamp0dB,
+                safetyMaxDb: effectiveMaxDb,
                 height: 18
             ) { newNorm in
                 engine.setOutputChannelFaderNormalized(channelIndex: channelIndex, normalized: newNorm)
@@ -627,7 +696,8 @@ private struct PrimaryOutputMonitorCard: View {
                 _ = engine.totalMix.setOutputFaderDb(
                     channel: channelIndex,
                     db: 0.0,
-                    safetyClamp0dB: safetyClamp0dB
+                    safetyClamp0dB: safetyClamp0dB,
+                    safetyMaxDb: effectiveMaxDb
                 )
             }
 
@@ -645,42 +715,186 @@ private struct PrimaryOutputMonitorCard: View {
                     .padding(.vertical, 5)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(ch.isMuted ? Color.cyan : Color.white.opacity(0.08))
+                            .fill(ch.isMuted ? TotalMixTheme.rmeRedDeep : TotalMixTheme.surfaceControl)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(
+                                        ch.isMuted ? TotalMixTheme.rmeRed : TotalMixTheme.borderSubtle,
+                                        lineWidth: 0.75
+                                    )
+                            )
                     )
-                    .foregroundStyle(ch.isMuted ? Color.black : Color.primary)
+                    .foregroundStyle(TotalMixTheme.textPrimary)
                 }
                 .buttonStyle(.plain)
 
                 Spacer()
 
-                Button {
-                    engine.setOutputChannelSafetyClamp(channelIndex: channelIndex, enabled: !safetyClamp0dB)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: safetyClamp0dB ? "lock.fill" : "lock.open")
-                            .font(.system(size: 10, weight: .bold))
-                        Text("0 dB 保护")
-                            .font(.system(size: 10.5, weight: .semibold))
+                // 音量上限保护分体开关：左侧开关保护，右侧展开自定义 dB 上限抽屉
+                HStack(spacing: 0) {
+                    Button {
+                        engine.setOutputChannelSafetyLimit(
+                            channelIndex: channelIndex,
+                            enabled: !safetyClamp0dB,
+                            maxDb: effectiveMaxDb
+                        )
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: safetyClamp0dB ? "lock.fill" : "lock.open")
+                                .font(.system(size: 9.5, weight: .bold))
+                            Text(safetyClamp0dB ? "上限 \(VolumeSafetyLimit.formatLimitDb(effectiveMaxDb))" : "保护已关")
+                                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                        }
+                        .padding(.leading, 8)
+                        .padding(.trailing, 6)
+                        .padding(.vertical, 5)
                     }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(safetyClamp0dB ? Color.orange.opacity(0.22) : Color.white.opacity(0.06))
-                    )
-                    .foregroundStyle(safetyClamp0dB ? Color.orange : Color.secondary)
+                    .buttonStyle(.plain)
+                    .help("开启或关闭旋钮音量保护上限（当前上限 \(VolumeSafetyLimit.formatLimitDb(effectiveMaxDb))）")
+
+                    Rectangle()
+                        .fill(safetyClamp0dB ? TotalMixTheme.rmeAmber.opacity(0.35) : TotalMixTheme.borderSubtle)
+                        .frame(width: 1, height: 14)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.16)) {
+                            isEditingSafetyLimit.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isEditingSafetyLimit ? "chevron.up" : "slider.horizontal.3")
+                            .font(.system(size: 9.5, weight: .bold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 5)
+                    }
+                    .buttonStyle(.plain)
+                    .help("展开并自由调整保护上限分贝值 (-60 ... +6 dB)")
                 }
-                .buttonStyle(.plain)
-                .help("开启后顺时针拧旋钮最高停在 0.0 dB，防止监听音箱意外过载")
+                .foregroundStyle(safetyClamp0dB ? TotalMixTheme.rmeAmber : TotalMixTheme.textSecondary)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(safetyClamp0dB ? TotalMixTheme.rmeAmber.opacity(0.18) : TotalMixTheme.surfaceControl)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(
+                                    safetyClamp0dB ? TotalMixTheme.rmeAmber.opacity(0.50) : TotalMixTheme.borderSubtle,
+                                    lineWidth: 0.75
+                                )
+                        )
+                )
+            }
+
+            if isEditingSafetyLimit {
+                inlineSafetyLimitDrawer(effectiveMaxDb: effectiveMaxDb)
             }
         }
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(Color.white.opacity(0.055))
+                .fill(TotalMixTheme.stripCardGradient)
                 .overlay(
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 1)
+                )
+        )
+    }
+
+    private func inlineSafetyLimitDrawer(effectiveMaxDb: Double) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                Text("保护上限")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(TotalMixTheme.textSecondary)
+
+                Text(VolumeSafetyLimit.formatLimitDb(effectiveMaxDb))
+                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(TotalMixTheme.rmeAmber)
+
+                Spacer()
+
+                Button {
+                    engine.setOutputChannelSafetyLimit(
+                        channelIndex: channelIndex,
+                        enabled: true,
+                        maxDb: effectiveMaxDb - 0.5
+                    )
+                } label: {
+                    Text("-0.5")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundStyle(TotalMixTheme.textPrimary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(TotalMixTheme.surfaceControl, in: RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    engine.setOutputChannelSafetyLimit(
+                        channelIndex: channelIndex,
+                        enabled: true,
+                        maxDb: effectiveMaxDb + 0.5
+                    )
+                } label: {
+                    Text("+0.5")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundStyle(TotalMixTheme.textPrimary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(TotalMixTheme.surfaceControl, in: RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 4) {
+                ForEach(VolumeSafetyLimit.quickPresetsDb, id: \.self) { preset in
+                    let selected = abs(effectiveMaxDb - preset) < 0.25
+                    Button {
+                        engine.setOutputChannelSafetyLimit(
+                            channelIndex: channelIndex,
+                            enabled: true,
+                            maxDb: preset
+                        )
+                    } label: {
+                        Text(preset == 0 ? "0" : (preset > 0 ? "+\(Int(preset))" : "\(Int(preset))"))
+                            .font(.system(size: 9.5, weight: selected ? .bold : .medium, design: .rounded))
+                            .monospacedDigit()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 3)
+                            .foregroundStyle(selected ? TotalMixTheme.chassisDeep : TotalMixTheme.textPrimary)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                                    .fill(selected ? TotalMixTheme.rmeAmber : TotalMixTheme.surfaceControl)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Slider(
+                value: Binding(
+                    get: { effectiveMaxDb },
+                    set: { rawVal in
+                        let snapped = (rawVal * 2.0).rounded() / 2.0
+                        engine.setOutputChannelSafetyLimit(
+                            channelIndex: channelIndex,
+                            enabled: true,
+                            maxDb: snapped
+                        )
+                    }
+                ),
+                in: VolumeSafetyLimit.minConfigurableDb...VolumeSafetyLimit.maxConfigurableDb
+            )
+            .tint(TotalMixTheme.rmeAmber)
+            .controlSize(.mini)
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(TotalMixTheme.chassisDeep)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.75)
                 )
         )
     }
@@ -691,6 +905,16 @@ private struct PrimaryOutputMonitorCard: View {
         }
         return ch.hasConfirmedValue ? ch.formattedDb : "--.- dB"
     }
+
+    private func readoutColor(for ch: MixerChannelState, atCeiling: Bool) -> Color {
+        if ch.isMuted {
+            return TotalMixTheme.rmeRed
+        }
+        if atCeiling || (ch.hasConfirmedValue && ch.dbValue > 0.05) {
+            return TotalMixTheme.rmeAmber
+        }
+        return TotalMixTheme.textPrimary
+    }
 }
 
 // MARK: - Multi-Channel Compact Monitor Card (2..N Channels)
@@ -700,6 +924,7 @@ private struct CompactOutputMonitorCard: View {
     let engine: CoordinatorEngine
     let channelIndex: Int
     let safetyClamp0dB: Bool
+    let safetyMaxDb: Double
 
     private var channelState: MixerChannelState {
         engine.totalMix.outputChannel(at: channelIndex) ?? MixerChannelState(
@@ -711,41 +936,92 @@ private struct CompactOutputMonitorCard: View {
 
     var body: some View {
         let ch = channelState
+        let effectiveMaxDb = VolumeSafetyLimit.clampCeilingDb(safetyMaxDb)
+
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(ch.isMuted ? TotalMixTheme.rmeRed : TotalMixTheme.accent)
+                    .frame(width: 2.5, height: 12)
+
                 Text(ch.displayName)
                     .font(.system(size: 12.5, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(TotalMixTheme.textPrimary)
 
                 Spacer()
 
                 Text(ch.isMuted ? "MUTED" : (ch.hasConfirmedValue ? ch.formattedDb : "--.- dB"))
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(ch.isMuted ? Color.cyan : Color.primary)
+                    .foregroundStyle(ch.isMuted ? TotalMixTheme.rmeRed : TotalMixTheme.textPrimary)
 
-                Button {
-                    engine.setOutputChannelSafetyClamp(channelIndex: channelIndex, enabled: !safetyClamp0dB)
+                Menu {
+                    Button {
+                        engine.setOutputChannelSafetyLimit(
+                            channelIndex: channelIndex,
+                            enabled: !safetyClamp0dB,
+                            maxDb: effectiveMaxDb
+                        )
+                    } label: {
+                        Label(
+                            safetyClamp0dB ? "关闭上限保护" : "开启上限保护 (\(VolumeSafetyLimit.formatLimitDb(effectiveMaxDb)))",
+                            systemImage: safetyClamp0dB ? "lock.open" : "lock.fill"
+                        )
+                    }
+                    Divider()
+                    ForEach(VolumeSafetyLimit.quickPresetsDb, id: \.self) { preset in
+                        Button {
+                            engine.setOutputChannelSafetyLimit(
+                                channelIndex: channelIndex,
+                                enabled: true,
+                                maxDb: preset
+                            )
+                        } label: {
+                            HStack {
+                                Text("上限设为 \(VolumeSafetyLimit.formatLimitDb(preset))")
+                                if safetyClamp0dB && abs(effectiveMaxDb - preset) < 0.25 {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
                 } label: {
-                    Image(systemName: safetyClamp0dB ? "lock.fill" : "lock.open")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(safetyClamp0dB ? Color.orange : Color.secondary)
-                        .frame(width: 22, height: 20)
-                        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
+                    HStack(spacing: 3) {
+                        Image(systemName: safetyClamp0dB ? "lock.fill" : "lock.open")
+                            .font(.system(size: 9, weight: .bold))
+                        if safetyClamp0dB {
+                            Text(VolumeSafetyLimit.formatLimitDb(effectiveMaxDb))
+                                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                        }
+                    }
+                    .foregroundStyle(safetyClamp0dB ? TotalMixTheme.rmeAmber : TotalMixTheme.textSecondary)
+                    .padding(.horizontal, 5.5)
+                    .frame(height: 20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(safetyClamp0dB ? TotalMixTheme.rmeAmber.opacity(0.18) : TotalMixTheme.surfaceControl)
+                    )
                 }
-                .buttonStyle(.plain)
-                .help("切换 0.0 dB 过载保护锁")
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("点击配置音量保护上限（当前：\(safetyClamp0dB ? VolumeSafetyLimit.formatLimitDb(effectiveMaxDb) : "已关闭")）")
 
                 Button {
                     _ = engine.toggleOutputChannelMute(channelIndex: channelIndex)
                 } label: {
                     Text("M")
                         .font(.system(size: 10.5, weight: .heavy))
-                        .foregroundStyle(ch.isMuted ? Color.black : Color.primary)
+                        .foregroundStyle(TotalMixTheme.textPrimary)
                         .frame(width: 22, height: 20)
                         .background(
                             RoundedRectangle(cornerRadius: 5)
-                                .fill(ch.isMuted ? Color.cyan : Color.white.opacity(0.08))
+                                .fill(ch.isMuted ? TotalMixTheme.rmeRedDeep : TotalMixTheme.surfaceControl)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5)
+                                .strokeBorder(ch.isMuted ? TotalMixTheme.rmeRed : TotalMixTheme.borderSubtle, lineWidth: 0.7)
                         )
                 }
                 .buttonStyle(.plain)
@@ -756,6 +1032,7 @@ private struct CompactOutputMonitorCard: View {
                 normalizedValue: ch.normalizedFader,
                 isMuted: ch.isMuted,
                 safetyClamp0dB: safetyClamp0dB,
+                safetyMaxDb: effectiveMaxDb,
                 height: 12
             ) { newNorm in
                 engine.setOutputChannelFaderNormalized(channelIndex: channelIndex, normalized: newNorm)
@@ -763,28 +1040,30 @@ private struct CompactOutputMonitorCard: View {
                 _ = engine.totalMix.setOutputFaderDb(
                     channel: channelIndex,
                     db: 0.0,
-                    safetyClamp0dB: safetyClamp0dB
+                    safetyClamp0dB: safetyClamp0dB,
+                    safetyMaxDb: effectiveMaxDb
                 )
             }
         }
         .padding(9)
         .background(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(Color.white.opacity(0.05))
+                .fill(TotalMixTheme.stripCardGradient)
                 .overlay(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                        .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.9)
                 )
         )
     }
 }
 
-// MARK: - Zero-Lag Horizontal Fader Bar with 0.0 dB Unity Tick
+// MARK: - Zero-Lag Horizontal Fader Bar with Custom Ceiling Marker & Unity Tick
 
 private struct RMEFaderBar: View {
     let normalizedValue: Double
     let isMuted: Bool
     let safetyClamp0dB: Bool
+    let safetyMaxDb: Double
     let height: CGFloat
     let onScrub: (Double) -> Void
     let onDoubleClickUnity: () -> Void
@@ -792,23 +1071,28 @@ private struct RMEFaderBar: View {
     private let unityPosition = RMEFaderCurve.zeroDbNormalized
 
     var body: some View {
+        let limitPosition = RMEFaderCurve.dbToNormalized(VolumeSafetyLimit.clampCeilingDb(safetyMaxDb))
+        let thumbWidth: CGFloat = height >= 16 ? 11 : 9
+        let thumbHeight: CGFloat = max(8, height - 1)
+
         GeometryReader { geo in
             let width = max(1, geo.size.width)
             let clamped = min(1.0, max(0.0, normalizedValue))
             let fillWidth = width * clamped
             let unityX = width * unityPosition
+            let limitX = width * limitPosition
 
             ZStack(alignment: .leading) {
                 // 轨道底槽
                 Capsule()
-                    .fill(Color.black.opacity(0.45))
+                    .fill(TotalMixTheme.chassisDeep)
 
-                // 若开启 0dB 安全锁，在 >0dB 区间铺设柔和警戒暗纹提示
+                // 若开启音量保护上限，在 > limitDb 区间铺设 RME 琥珀色警戒区间
                 if safetyClamp0dB {
                     Rectangle()
-                        .fill(Color.orange.opacity(0.12))
-                        .frame(width: max(0, width - unityX))
-                        .offset(x: unityX)
+                        .fill(TotalMixTheme.rmeAmber.opacity(0.18))
+                        .frame(width: max(0, width - limitX))
+                        .offset(x: limitX)
                 }
 
                 // 实时音量填充条（禁用隐式补间防高频延迟）
@@ -819,26 +1103,45 @@ private struct RMEFaderBar: View {
                         tx.disablesAnimations = true
                     }
 
-                // 0.0 dB (836/1023) 刻度白线
+                // 0.0 dB (836/1023) 统一参考刻度线
                 Rectangle()
-                    .fill(Color.white.opacity(0.85))
+                    .fill(TotalMixTheme.textPrimary.opacity(0.72))
                     .frame(width: 1.5, height: height)
                     .offset(x: min(width - 1.5, max(0, unityX - 0.75)))
 
-                // 推子滑块游标
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: height - 2, height: height - 2)
-                    .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
-                    .offset(x: min(width - (height - 2), max(0, fillWidth - (height - 2) * 0.5)))
-                    .transaction { tx in
-                        tx.disablesAnimations = true
-                    }
+                // 自定义安全保护上限高亮标记线
+                if safetyClamp0dB {
+                    Rectangle()
+                        .fill(TotalMixTheme.rmeAmber)
+                        .frame(width: 2.0, height: height)
+                        .offset(x: min(width - 2.0, max(0, limitX - 1.0)))
+                }
+
+                // TotalMix 拟物滑块推子帽（带中心黑槽）
+                ZStack {
+                    RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [TotalMixTheme.faderCapTop, TotalMixTheme.faderCapBottom],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    Rectangle()
+                        .fill(TotalMixTheme.faderCapGroove)
+                        .frame(width: 1.5, height: max(5, thumbHeight - 5))
+                }
+                .frame(width: thumbWidth, height: thumbHeight)
+                .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
+                .offset(x: min(width - thumbWidth, max(0, fillWidth - thumbWidth * 0.5)))
+                .transaction { tx in
+                    tx.disablesAnimations = true
+                }
             }
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+                    .strokeBorder(TotalMixTheme.borderSubtle, lineWidth: 0.85)
             )
             .contentShape(Rectangle())
             .gesture(
@@ -861,20 +1164,20 @@ private struct RMEFaderBar: View {
     private var fillGradient: LinearGradient {
         if isMuted {
             return LinearGradient(
-                colors: [Color.cyan.opacity(0.45), Color.cyan.opacity(0.75)],
+                colors: [TotalMixTheme.rmeRedDeep.opacity(0.68), TotalMixTheme.rmeRed.opacity(0.86)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
         }
         if normalizedValue > unityPosition + 0.002 {
             return LinearGradient(
-                colors: [Color.green.opacity(0.85), Color.orange.opacity(0.95)],
+                colors: [TotalMixTheme.rmeGreen, TotalMixTheme.rmeAmber, TotalMixTheme.rmeRed],
                 startPoint: .leading,
                 endPoint: .trailing
             )
         }
         return LinearGradient(
-            colors: [Color(red: 0.16, green: 0.68, blue: 0.92), Color(red: 0.22, green: 0.86, blue: 0.72)],
+            colors: [TotalMixTheme.rmeGreenDeep, TotalMixTheme.rmeGreen, TotalMixTheme.rmeGreenBright],
             startPoint: .leading,
             endPoint: .trailing
         )

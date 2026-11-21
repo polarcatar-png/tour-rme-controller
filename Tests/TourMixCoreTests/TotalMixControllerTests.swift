@@ -307,4 +307,50 @@ struct TotalMixControllerTests {
 
         controller.stop()
     }
+
+    @Test("自定义音量上限 (-12 dB / -6 dB)：支持旋钮步进、推子拖动、setOutputFaderDb 与冷启动重放")
+    @MainActor
+    func customSafetyCeilingAcrossFaderOperations() {
+        var sentMessages: [OSCMessage] = []
+        let mockNow: TimeInterval = 700.0
+        let controller = TotalMixController(
+            settleSyncDebounceSeconds: 10.0,
+            nowProvider: { mockNow },
+            sendHandler: { sentMessages.append($0) }
+        )
+
+        // 1. 冷启动时绑定 -12.0 dB 上限并上拧 +5.0 dB
+        _ = controller.adjustOutputFaderDb(channel: 0, deltaDb: 5.0, safetyClamp0dB: true, safetyMaxDb: -12.0)
+        controller.handleIncomingMessage(.float("/output/0/volume", Float(-14.0)), timestamp: mockNow)
+        #expect(abs(controller.outputChannels[0].dbValue - (-12.0)) < 0.05)
+
+        // 2. 从 -12.0 dB 继续顺时针拧 +1.0 dB -> 锁死在 -12.0 dB 且 hitZeroDbLock == true
+        let clampedStep = controller.adjustOutputFaderDb(channel: 0, deltaDb: 1.0, safetyClamp0dB: true, safetyMaxDb: -12.0)
+        #expect(clampedStep.hitZeroDbLock == true)
+        #expect(clampedStep.safetyMaxDb == -12.0)
+        #expect(abs(clampedStep.dbValue - (-12.0)) < 0.05)
+
+        // 3. setOutputFaderNormalized 拖动到 0 dB 时受 -6.0 dB 上限保护钳位到 -6.0 dB
+        let normRes = controller.setOutputFaderNormalized(
+            channel: 0,
+            normalized: RMEFaderCurve.zeroDbNormalized,
+            safetyClamp0dB: true,
+            safetyMaxDb: -6.0
+        )
+        #expect(normRes.hitZeroDbLock == true)
+        #expect(abs(normRes.dbValue - (-6.0)) < 0.05)
+
+        // 4. setOutputFaderDb(0.0) 受 -12.0 dB 上限保护钳位到 -12.0 dB
+        let dbRes = controller.setOutputFaderDb(
+            channel: 0,
+            db: 0.0,
+            safetyClamp0dB: true,
+            safetyMaxDb: -12.0
+        )
+        #expect(dbRes.hitZeroDbLock == true)
+        #expect(dbRes.safetyMaxDb == -12.0)
+        #expect(abs(dbRes.dbValue - (-12.0)) < 0.05)
+
+        controller.stop()
+    }
 }

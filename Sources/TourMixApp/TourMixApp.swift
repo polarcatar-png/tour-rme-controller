@@ -138,6 +138,7 @@ final class TourMixAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
                     dbText: event.dbText,
                     normalizedLevel: event.normalizedLevel,
                     unityNormalizedPosition: event.unityNormalizedPosition,
+                    safetyLimitNormalizedPosition: event.safetyLimitNormalizedPosition,
                     isMuted: event.isMuted,
                     hitZeroDbLock: event.hitZeroDbLock,
                     badgeText: event.badgeText,

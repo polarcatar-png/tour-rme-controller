@@ -130,6 +130,7 @@ public final class TotalMixController {
     private struct PendingColdStartAdjustment {
         var deltaDb: Double
         var safetyClamp0dB: Bool
+        var safetyMaxDb: Double
         var lastQueryTimestamp: TimeInterval
     }
 
@@ -423,18 +424,20 @@ public final class TotalMixController {
     ///
     /// - 立体声对自动归并至偶数左声道 `2k`。
     /// - 若 `hasConfirmedValue == false`，启动冷启动保护：累加 `pendingDeltaDb` 并立即请求 `/sendchan/output/{2k} 1.0f`，绝不跳变。
-    /// - 若开启 `safetyClamp0dB`，从 `<= 0.0 dB` 顺时针上推时精准钳位在 `0.0 dB` (`836 / 1023`) 并返回 `hitZeroDbLock = true`。
+    /// - 若开启 `safetyClamp0dB`，从 `<= safetyMaxDb` 顺时针上推时精准钳位在 `safetyMaxDb` 并返回 `hitZeroDbLock = true`。
     @discardableResult
     public func adjustOutputFaderDb(
         channel: Int,
         deltaDb: Double,
-        safetyClamp0dB: Bool = true
+        safetyClamp0dB: Bool = true,
+        safetyMaxDb: Double = VolumeSafetyLimit.defaultMaxDb
     ) -> FaderStepResult {
         let rawClamped = min(max(0, channel), Self.maxChannelIndexLimit - 1)
         ensureChannelCapacity(bus: .output, upToIndex: rawClamped)
         let targetIndex = canonicalOutputIndex(rawClamped)
         let currentChannel = outputChannels[targetIndex]
         let now = nowProvider()
+        let limitDb = VolumeSafetyLimit.clampCeilingDb(safetyMaxDb)
 
         // 冷启动防跳变保护：尚未拿到 TotalMix 真实音量前绝不盲发 faderlin
         if !currentChannel.hasConfirmedValue {
@@ -442,10 +445,12 @@ public final class TotalMixController {
             var pending = pendingColdStartAdjustments[targetIndex] ?? PendingColdStartAdjustment(
                 deltaDb: 0.0,
                 safetyClamp0dB: safetyClamp0dB,
+                safetyMaxDb: limitDb,
                 lastQueryTimestamp: 0.0
             )
             pending.deltaDb += deltaDb
             pending.safetyClamp0dB = safetyClamp0dB
+            pending.safetyMaxDb = limitDb
 
             if !hadPending || (now - pending.lastQueryTimestamp) >= 0.080 {
                 pending.lastQueryTimestamp = now
@@ -462,28 +467,28 @@ public final class TotalMixController {
                 dbValue: currentChannel.dbValue,
                 formattedDb: currentChannel.formattedDb,
                 hitZeroDbLock: false,
+                safetyMaxDb: safetyClamp0dB ? limitDb : nil,
                 isDeferredColdStart: true,
                 isMuted: currentChannel.isMuted
             )
         }
 
         let currentDb = currentChannel.dbValue
-        let targetDb: Double
-        let hitZeroDbLock: Bool
-
-        if safetyClamp0dB && deltaDb > 0.0 && currentDb <= 0.001 && (currentDb + deltaDb) > 0.0 {
-            targetDb = 0.0
-            hitZeroDbLock = true
-        } else {
-            targetDb = min(RMEFaderCurve.maxDb, max(RMEFaderCurve.minDb, currentDb + deltaDb))
-            hitZeroDbLock = false
-        }
+        let clamped = applySafetyCeilingClamp(
+            currentDb: currentDb,
+            deltaDb: deltaDb,
+            enabled: safetyClamp0dB,
+            maxDb: limitDb
+        )
+        let targetDb = min(RMEFaderCurve.maxDb, max(RMEFaderCurve.minDb, clamped.targetDb))
+        let hitZeroDbLock = clamped.hitLimitLock
 
         let targetNorm = RMEFaderCurve.dbToNormalized(targetDb)
         return commitOptimisticOutputFader(
             targetIndex: targetIndex,
             normalized: targetNorm,
             hitZeroDbLock: hitZeroDbLock,
+            safetyMaxDb: safetyClamp0dB ? limitDb : nil,
             timestamp: now
         )
     }
@@ -493,17 +498,20 @@ public final class TotalMixController {
     public func setOutputFaderNormalized(
         channel: Int,
         normalized: Double,
-        safetyClamp0dB: Bool = false
+        safetyClamp0dB: Bool = false,
+        safetyMaxDb: Double = VolumeSafetyLimit.defaultMaxDb
     ) -> FaderStepResult {
         let rawClamped = min(max(0, channel), Self.maxChannelIndexLimit - 1)
         ensureChannelCapacity(bus: .output, upToIndex: rawClamped)
         let targetIndex = canonicalOutputIndex(rawClamped)
         pendingColdStartAdjustments.removeValue(forKey: targetIndex)
 
+        let limitDb = VolumeSafetyLimit.clampCeilingDb(safetyMaxDb)
+        let limitNorm = RMEFaderCurve.dbToNormalized(limitDb)
         var clampedNorm = RMEFaderCurve.clampNormalized(normalized)
         var hitZeroDbLock = false
-        if safetyClamp0dB && clampedNorm > RMEFaderCurve.zeroDbNormalized {
-            clampedNorm = RMEFaderCurve.zeroDbNormalized
+        if safetyClamp0dB && clampedNorm > limitNorm {
+            clampedNorm = limitNorm
             hitZeroDbLock = true
         }
 
@@ -511,6 +519,7 @@ public final class TotalMixController {
             targetIndex: targetIndex,
             normalized: clampedNorm,
             hitZeroDbLock: hitZeroDbLock,
+            safetyMaxDb: safetyClamp0dB ? limitDb : nil,
             timestamp: nowProvider()
         )
     }
@@ -520,24 +529,28 @@ public final class TotalMixController {
     public func setOutputFaderDb(
         channel: Int,
         db: Double,
-        safetyClamp0dB: Bool = false
+        safetyClamp0dB: Bool = false,
+        safetyMaxDb: Double = VolumeSafetyLimit.defaultMaxDb
     ) -> FaderStepResult {
-        let hitLock = safetyClamp0dB && db > 0.0
-        let effectiveDb = hitLock ? 0.0 : db
+        let limitDb = VolumeSafetyLimit.clampCeilingDb(safetyMaxDb)
+        let hitLock = safetyClamp0dB && db > limitDb
+        let effectiveDb = hitLock ? limitDb : db
         let norm = RMEFaderCurve.dbToNormalized(effectiveDb)
         var result = setOutputFaderNormalized(
             channel: channel,
             normalized: norm,
-            safetyClamp0dB: false
+            safetyClamp0dB: false,
+            safetyMaxDb: limitDb
         )
-        if hitLock {
+        if hitLock || safetyClamp0dB {
             result = FaderStepResult(
                 channelIndex: result.channelIndex,
                 displayName: result.displayName,
                 normalizedFader: result.normalizedFader,
                 dbValue: result.dbValue,
                 formattedDb: result.formattedDb,
-                hitZeroDbLock: true,
+                hitZeroDbLock: hitLock,
+                safetyMaxDb: safetyClamp0dB ? limitDb : nil,
                 isDeferredColdStart: false,
                 isMuted: result.isMuted
             )
@@ -1026,6 +1039,7 @@ public final class TotalMixController {
         targetIndex: Int,
         normalized: Double,
         hitZeroDbLock: Bool,
+        safetyMaxDb: Double? = nil,
         timestamp: TimeInterval
     ) -> FaderStepResult {
         let clampedNorm = RMEFaderCurve.clampNormalized(normalized)
@@ -1063,6 +1077,7 @@ public final class TotalMixController {
             dbValue: updated.dbValue,
             formattedDb: updated.formattedDb,
             hitZeroDbLock: hitZeroDbLock,
+            safetyMaxDb: safetyMaxDb,
             isDeferredColdStart: false,
             isMuted: updated.isMuted
         )
@@ -1100,7 +1115,8 @@ public final class TotalMixController {
             _ = adjustOutputFaderDb(
                 channel: index,
                 deltaDb: pending.deltaDb,
-                safetyClamp0dB: pending.safetyClamp0dB
+                safetyClamp0dB: pending.safetyClamp0dB,
+                safetyMaxDb: pending.safetyMaxDb
             )
         }
     }
