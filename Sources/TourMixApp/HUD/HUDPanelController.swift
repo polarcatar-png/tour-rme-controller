@@ -11,11 +11,13 @@ import SwiftUI
 public final class HUDPanelController {
     public static let panelSize = NSSize(width: 336, height: 84)
     public static let bottomOffset: CGFloat = 72
+    private static let orderFrontCooldownSeconds: TimeInterval = 0.25
 
     private let viewModel = HUDViewModel()
     private var panel: NSPanel?
     private var fadeGeneration: UInt64 = 0
     private var fadeTask: Task<Void, Never>?
+    private var lastOrderFrontTimestamp: TimeInterval = 0
 
     /// Hold duration in milliseconds before starting alpha fade-out. Default: `1200` ms.
     public var holdDurationMs: Int = 1200
@@ -34,7 +36,7 @@ public final class HUDPanelController {
             defer: false
         )
 
-        hudPanel.level = .statusBar
+        hudPanel.level = .screenSaver
         hudPanel.collectionBehavior = [
             .canJoinAllSpaces,
             .fullScreenAuxiliary,
@@ -74,31 +76,39 @@ public final class HUDPanelController {
 
         positionPanelIfNeeded(activePanel)
 
-        // Immediately cancel any in-flight AppKit alpha animation and restore full opacity
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0
-            activePanel.animator().alphaValue = 1.0
-        }
+        let wasHiddenOrTransparent = !activePanel.isVisible
+            || !activePanel.isOnActiveSpace
+            || activePanel.alphaValue < 0.99
+
+        // Direct synchronous alpha write avoids macOS AppKit animator() mid-fade cancellation races
         activePanel.alphaValue = 1.0
 
-        if !activePanel.isVisible {
+        let now = ProcessInfo.processInfo.systemUptime
+        if wasHiddenOrTransparent || (now - lastOrderFrontTimestamp) >= Self.orderFrontCooldownSeconds {
+            activePanel.level = .screenSaver
+            activePanel.hidesOnDeactivate = false
             activePanel.orderFrontRegardless()
+            lastOrderFrontTimestamp = now
         }
 
         let holdMs = max(150, holdDurationMs)
         fadeTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(holdMs))
-            guard !Task.isCancelled, let self, self.fadeGeneration == generation, let panel = self.panel else { return }
+            guard !Task.isCancelled, let self, self.fadeGeneration == generation, self.panel != nil else { return }
 
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.18
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().alphaValue = 0.0
-            }, completionHandler: nil)
+            let steps = 12
+            for step in 1...steps {
+                try? await Task.sleep(for: .milliseconds(15))
+                guard !Task.isCancelled, self.fadeGeneration == generation, let panel = self.panel else { return }
+                let progress = Double(step) / Double(steps)
+                let alpha = CGFloat(pow(1.0 - progress, 2.0))
+                panel.alphaValue = alpha
+            }
 
-            try? await Task.sleep(for: .milliseconds(190))
             guard !Task.isCancelled, self.fadeGeneration == generation, let panel = self.panel else { return }
+            panel.alphaValue = 0.0
             panel.orderOut(nil)
+            self.lastOrderFrontTimestamp = 0
         }
     }
 
@@ -107,6 +117,7 @@ public final class HUDPanelController {
         fadeGeneration &+= 1
         fadeTask?.cancel()
         fadeTask = nil
+        lastOrderFrontTimestamp = 0
         guard let panel else { return }
         panel.alphaValue = 0.0
         panel.orderOut(nil)

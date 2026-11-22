@@ -220,7 +220,9 @@ final class TourMixAppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
             if popover.contentViewController == nil {
                 popover.contentViewController = makePopoverHostingController()
             }
+            NSApp.activate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
         }
     }
 

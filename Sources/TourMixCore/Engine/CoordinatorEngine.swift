@@ -187,6 +187,7 @@ public final class CoordinatorEngine {
         )
         self.serialService = TourBoxSerialService()
         self.actionExecutor = SystemActionExecutor()
+        wireTotalMixCallbacks()
         rebuildStateMachineConfiguration()
     }
 
@@ -205,7 +206,14 @@ public final class CoordinatorEngine {
         self.totalMix = totalMix
         self.serialService = serialService
         self.actionExecutor = actionExecutor ?? SystemActionExecutor()
+        wireTotalMixCallbacks()
         rebuildStateMachineConfiguration()
+    }
+
+    private func wireTotalMixCallbacks() {
+        totalMix.onDeferredOutputFaderApplied = { [weak self] stepResult in
+            self?.emitOutputFaderHUD(for: stepResult)
+        }
     }
 
     deinit {
@@ -740,22 +748,7 @@ public final class CoordinatorEngine {
             )
 
             guard !stepResult.isDeferredColdStart else { return }
-
-            let limitNorm: Double? = safetyClamp0dB ? RMEFaderCurve.dbToNormalized(limitDb) : nil
-            emitHUDIfEnabled(
-                CoordinatorHUDEvent(
-                    title: stepResult.displayName,
-                    subtitle: "Hardware Output",
-                    dbText: stepResult.isMuted ? "MUTED" : stepResult.formattedDb,
-                    normalizedLevel: stepResult.normalizedFader,
-                    unityNormalizedPosition: RMEFaderCurve.zeroDbNormalized,
-                    safetyLimitNormalizedPosition: limitNorm,
-                    isMuted: stepResult.isMuted,
-                    hitZeroDbLock: stepResult.hitZeroDbLock,
-                    badgeText: stepResult.hitZeroDbLock ? VolumeSafetyLimit.formatMaxBadge(limitDb) : nil,
-                    systemIcon: stepResult.isMuted ? "speaker.slash.fill" : "hifispeaker.2.fill"
-                )
-            )
+            emitOutputFaderHUD(for: stepResult)
 
         case .rmeSubmixFader(let sourceBus, let sourceIndex, let outputIndex, let ballistics, let safetyClamp0dB, let safetyMaxDb):
             var state = ballisticsBySlot[slotKey, default: RotaryBallisticsState()]
@@ -1116,6 +1109,29 @@ public final class CoordinatorEngine {
             wsCenter.removeObserver(workspaceSleepObserver)
             self.workspaceSleepObserver = nil
         }
+    }
+
+    private func emitOutputFaderHUD(for stepResult: FaderStepResult) {
+        let limitNorm = stepResult.safetyMaxDb.map {
+            RMEFaderCurve.dbToNormalized(VolumeSafetyLimit.clampCeilingDb($0))
+        }
+        let badgeText: String? = stepResult.hitZeroDbLock
+            ? VolumeSafetyLimit.formatMaxBadge(stepResult.safetyMaxDb ?? 0.0)
+            : nil
+        emitHUDIfEnabled(
+            CoordinatorHUDEvent(
+                title: stepResult.displayName,
+                subtitle: "Hardware Output",
+                dbText: stepResult.isMuted ? "MUTED" : stepResult.formattedDb,
+                normalizedLevel: stepResult.normalizedFader,
+                unityNormalizedPosition: RMEFaderCurve.zeroDbNormalized,
+                safetyLimitNormalizedPosition: limitNorm,
+                isMuted: stepResult.isMuted,
+                hitZeroDbLock: stepResult.hitZeroDbLock,
+                badgeText: badgeText,
+                systemIcon: stepResult.isMuted ? "speaker.slash.fill" : "hifispeaker.2.fill"
+            )
+        )
     }
 
     private func emitHUDIfEnabled(_ event: CoordinatorHUDEvent) {

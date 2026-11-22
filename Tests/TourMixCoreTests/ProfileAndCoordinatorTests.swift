@@ -296,4 +296,56 @@ struct ProfileAndCoordinatorTests {
 
         engine.stop()
     }
+
+    @Test("冷启动首次旋钮增量在收到 TotalMix 回包落地时自动补弹 HUD（含自定义上限徽章）")
+    @MainActor
+    func coldStartDeferredReplayEmitsHUD() {
+        var sentOSC: [OSCMessage] = []
+        let mockNow: TimeInterval = 3000.0
+        let totalMix = TotalMixController(
+            settleSyncDebounceSeconds: 10.0,
+            nowProvider: { mockNow },
+            sendHandler: { sentOSC.append($0) }
+        )
+
+        var profile = ProfileConfig.factoryDefault
+        profile.rotaryBindings[.knob] = .rmeOutputFader(
+            channelIndex: 0,
+            ballistics: .standard,
+            safetyClamp0dB: true,
+            safetyMaxDb: -12.0
+        )
+        let config = AppConfiguration(
+            profiles: [profile],
+            activeProfileId: profile.id
+        )
+
+        let engine = CoordinatorEngine(
+            configuration: config,
+            persistChangesToDisk: false,
+            totalMix: totalMix
+        )
+
+        var hudEvents: [CoordinatorHUDEvent] = []
+        engine.onHUDEvent = { hudEvents.append($0) }
+
+        // 1. 通道 0 尚未确认初始音量，先拧一格 +0.5 dB（触发 /sendchan/output/0 且暂存增量）
+        engine.handleDecodedInput(.rotaryStep(.knob, .cw), timestamp: 30.0)
+        #expect(hudEvents.isEmpty)
+        #expect(sentOSC.contains(.float("/sendchan/output/0", Float(1.0))))
+
+        // 2. TotalMix 返回当前音量 -12.2 dB -> 叠加 +0.5 dB 被 -12.0 dB 上限钳位，并立即补弹 HUD！
+        totalMix.handleIncomingMessage(.float("/output/0/volume", Float(-12.2)), timestamp: mockNow)
+
+        #expect(hudEvents.count == 1)
+        #expect(hudEvents[0].title == "AN 1/2")
+        #expect(hudEvents[0].dbText == "-12.0 dB")
+        #expect(hudEvents[0].hitZeroDbLock == true)
+        #expect(hudEvents[0].badgeText == "-12 dB MAX")
+
+        let expectedLimitPos = RMEFaderCurve.dbToNormalized(-12.0)
+        #expect(abs((hudEvents[0].safetyLimitNormalizedPosition ?? -1) - expectedLimitPos) < 1e-6)
+
+        engine.stop()
+    }
 }

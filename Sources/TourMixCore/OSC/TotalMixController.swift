@@ -125,6 +125,10 @@ public final class TotalMixController {
         return FirefaceUCXProfile.stereoDefaultLabel(bus: .output, evenIndex: idx)
     }
 
+    /// 当冷启动暂存的旋钮增量在收到 TotalMix 首次权威音量回包后落地发送时触发（供 HUD 补弹反馈）。
+    @ObservationIgnored
+    public var onDeferredOutputFaderApplied: ((FaderStepResult) -> Void)?
+
     // MARK: - Private State
 
     private struct PendingColdStartAdjustment {
@@ -1110,14 +1114,17 @@ public final class TotalMixController {
             ch.hasConfirmedValue = true
         }
 
-        // 冷启动防跳变落地：一旦拿到真实初始音量，立即将暂存增量平滑叠加发送！
+        // 冷启动防跳变落地：一旦拿到真实初始音量，立即将暂存增量平滑叠加发送并通知补弹 HUD！
         if let pending = pendingColdStartAdjustments.removeValue(forKey: index) {
-            _ = adjustOutputFaderDb(
+            let applied = adjustOutputFaderDb(
                 channel: index,
                 deltaDb: pending.deltaDb,
                 safetyClamp0dB: pending.safetyClamp0dB,
                 safetyMaxDb: pending.safetyMaxDb
             )
+            if !applied.isDeferredColdStart {
+                onDeferredOutputFaderApplied?(applied)
+            }
         }
     }
 
